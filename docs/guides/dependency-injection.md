@@ -1,6 +1,6 @@
 # 服务解析使用指南
 
-本文档介绍在 Ego 框架中如何优雅地解析和使用依赖注入的服务。
+本文档介绍在 CSGO 框架中如何优雅地解析和使用依赖注入的服务。
 
 ---
 
@@ -237,7 +237,7 @@ app.MapGet("/users", (UserService svc) =>
 });
 ```
 
-### Ego 代码（Style 2）
+### CSGO 代码（Style 2）
 ```go
 app.MapGet("/users", func(c *gin.Context) {
     svc := di.GetRequiredService[*UserService](app.Services)

@@ -42,7 +42,7 @@ public class UserController : ControllerBase
 }
 ```
 
-在 Ego 中：
+在 csgo 中：
 ```go
 type UserController struct {
     userService services.UserService
@@ -162,7 +162,7 @@ app.MapControllers();
 app.Run();
 ```
 
-### Ego 代码
+### csgo 代码
 
 ```go
 // main.go

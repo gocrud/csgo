@@ -20,9 +20,9 @@ go get github.com/gocrud/csgo
 ### 1. 初始化项目
 
 ```bash
-mkdir my-ego-app
-cd my-ego-app
-go mod init my-ego-app
+mkdir my-csgo-app
+cd my-csgo-app
+go mod init my-csgo-app
 ```
 
 ### 2. 创建 main.go

@@ -1,6 +1,6 @@
 # Controller Pattern Demo
 
-这个示例展示了如何在 Ego 框架中使用控制器（Controller）模式，这是 .NET MVC/Web API 中非常经典的模式。
+这个示例展示了如何在 csgo 框架中使用控制器（Controller）模式，这是 .NET MVC/Web API 中非常经典的模式。
 
 ## 📁 项目结构
 
@@ -35,7 +35,7 @@ public class UserController : ControllerBase
 }
 ```
 
-### Ego 风格
+### csgo 风格
 
 ```go
 type UserController struct {
@@ -203,7 +203,7 @@ curl -X DELETE http://localhost:8080/api/users/1
 
 ## 📊 与 .NET 的对比
 
-| 特性 | .NET | Ego | 一致性 |
+| 特性 | .NET | csgo | 一致性 |
 |------|------|-----|--------|
 | 控制器类 | `class UserController` | `type UserController struct` | 100% |
 | 依赖注入 | 构造函数自动注入 | 构造函数手动解析 | 95% |

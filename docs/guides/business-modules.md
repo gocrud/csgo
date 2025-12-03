@@ -406,7 +406,7 @@ app.Run();
 
 ---
 
-### Ego 代码
+### CSGO 代码
 
 ```go
 // users/service_collection_extensions.go
@@ -449,7 +449,7 @@ func main() {
 
 ### 一致性分析
 
-| 特性 | .NET | Ego | 一致性 |
+| 特性 | .NET | CSGO | 一致性 |
 |------|------|-----|--------|
 | **扩展方法模式** | `this IServiceCollection` | 顶层函数 | 98% |
 | **命名约定** | `AddXxxServices` | `AddXxxServices` | 100% |

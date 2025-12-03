@@ -23,7 +23,7 @@ func main() {
 	swagger.AddSwaggerGen(builder.Services, func(opts *swagger.SwaggerGenOptions) {
 		opts.Title = "Controller Demo API"
 		opts.Version = "v1"
-		opts.Description = "Demonstrates the Controller pattern in Ego framework"
+		opts.Description = "Demonstrates the Controller pattern in csgo framework"
 		opts.AddSecurityDefinition("Bearer", openapi.SecurityScheme{
 			Type:         "http",
 			Scheme:       "bearer",

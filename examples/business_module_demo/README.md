@@ -26,7 +26,7 @@ business_module_demo/
 builder.Services.AddUserServices();
 ```
 
-在 Ego 中：
+在 csgo 中：
 ```go
 users.AddUserServices(builder.Services)
 ```

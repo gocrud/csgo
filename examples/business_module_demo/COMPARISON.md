@@ -1,6 +1,6 @@
-# .NET vs Ego: 业务模块扩展对比
+# .NET vs CSGO: 业务模块扩展对比
 
-本文档展示 .NET 和 Ego 框架在业务模块扩展方面的对比。
+本文档展示 .NET 和 CSGO 框架在业务模块扩展方面的对比。
 
 ---
 
@@ -25,7 +25,7 @@ MyApp/
     └── OrderServiceCollectionExtensions.cs  # ✅ 扩展方法
 ```
 
-### Ego 项目结构
+### CSGO 项目结构
 
 ```
 myapp/
@@ -65,7 +65,7 @@ public static class UserServiceCollectionExtensions
 }
 ```
 
-#### Ego
+#### CSGO
 
 ```go
 // users/service_collection_extensions.go
@@ -113,7 +113,7 @@ public static IServiceCollection AddUserServices(
 }
 ```
 
-#### Ego
+#### CSGO
 
 ```go
 // users/user_module_options.go
@@ -173,7 +173,7 @@ var app = builder.Build();
 app.Run();
 ```
 
-#### Ego
+#### CSGO
 
 ```go
 // main.go
@@ -196,7 +196,7 @@ func main() {
 
 **差异：**
 - .NET: `builder.Services.AddUserServices()`
-- Ego: `users.AddUserServices(builder.Services)`
+- CSGO: `users.AddUserServices(builder.Services)`
 
 **一致性：96%** ✅
 
@@ -223,7 +223,7 @@ app.MapGet("/api/users", (IServiceProvider services) =>
 });
 ```
 
-#### Ego
+#### CSGO
 
 ```go
 // Style 1: Traditional
@@ -250,7 +250,7 @@ app.MapGet("/api/users", func(c *gin.Context) {
 
 ## 📊 完整对比表
 
-| 特性 | .NET | Ego | 一致性 |
+| 特性 | .NET | CSGO | 一致性 |
 |------|------|-----|--------|
 | **项目结构** | 模块化包 | 模块化包 | 100% |
 | **扩展方法** | `this IServiceCollection` | 顶层函数 | 95% |
@@ -300,7 +300,7 @@ app.Run();
 
 ---
 
-### Ego 完整示例
+### CSGO 完整示例
 
 ```go
 // users/service_collection_extensions.go
@@ -347,13 +347,13 @@ func main() {
 
 1. ⚠️ .NET 使用扩展方法，Go 使用顶层函数
 2. ⚠️ .NET 支持参数自动注入，Go 需要手动获取服务
-3. ⚠️ .NET 有 Scoped 生命周期，Ego 只有 Singleton 和 Transient
+3. ⚠️ .NET 有 Scoped 生命周期，CSGO 只有 Singleton 和 Transient
 
 ### 整体评价
 
-**Ego 框架成功地将 .NET 的业务模块扩展模式移植到了 Go，保持了 96% 的一致性！** 🎉
+**CSGO 框架成功地将 .NET 的业务模块扩展模式移植到了 Go，保持了 96% 的一致性！** 🎉
 
 虽然由于语言特性的限制（Go 没有扩展方法、没有参数注入），存在一些语法上的差异，但**核心设计理念和使用体验高度一致**。
 
-对于熟悉 .NET 的开发者来说，使用 Ego 框架几乎没有学习成本！🚀
+对于熟悉 .NET 的开发者来说，使用 CSGO 框架几乎没有学习成本！🚀
 

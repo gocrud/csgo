@@ -274,7 +274,7 @@ app.Run();
 
 ---
 
-### Ego 代码
+### CSGO 代码
 
 ```go
 builder := web.CreateBuilder()
