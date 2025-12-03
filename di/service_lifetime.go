@@ -7,9 +7,6 @@ const (
 	// Singleton specifies that a single instance of the service will be created.
 	Singleton ServiceLifetime = iota
 
-	// Scoped specifies that a single instance will be created per scope (e.g., per HTTP request).
-	Scoped
-
 	// Transient specifies that a new instance of the service will be created every time it is requested.
 	Transient
 )
@@ -19,8 +16,6 @@ func (l ServiceLifetime) String() string {
 	switch l {
 	case Singleton:
 		return "Singleton"
-	case Scoped:
-		return "Scoped"
 	case Transient:
 		return "Transient"
 	default:

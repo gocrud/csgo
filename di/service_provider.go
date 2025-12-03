@@ -39,18 +39,14 @@ type IServiceProvider interface {
 	// IsService checks if a service is registered.
 	IsService(serviceType reflect.Type) bool
 
-	// CreateScope creates a service scope.
-	CreateScope() IServiceScope
-
 	// Dispose releases all resources.
 	Dispose() error
 }
 
 // serviceProvider is the concrete implementation of IServiceProvider.
 type serviceProvider struct {
-	engine         *internal.Engine
-	validateScopes bool
-	disposed       atomic.Bool
+	engine   *internal.Engine
+	disposed atomic.Bool
 }
 
 // GetService retrieves a service and populates it into the target pointer.
@@ -198,18 +194,6 @@ func (p *serviceProvider) GetRequiredKeyedService(target interface{}, serviceKey
 // IsService checks if a service is registered.
 func (p *serviceProvider) IsService(serviceType reflect.Type) bool {
 	return p.engine.Contains(serviceType, "")
-}
-
-// CreateScope creates a service scope.
-func (p *serviceProvider) CreateScope() IServiceScope {
-	if p.disposed.Load() {
-		panic("Cannot create scope from disposed provider")
-	}
-
-	return &serviceScope{
-		parent:    p,
-		instances: make(map[internal.RegistrationKey]interface{}),
-	}
 }
 
 // Dispose releases all resources.

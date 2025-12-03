@@ -47,11 +47,6 @@ func AddSingleton[TService any](services IServiceCollection, factory func() TSer
 	return services.AddSingleton(factory)
 }
 
-// AddScoped is a generic helper to add a scoped service.
-func AddScoped[TService any](services IServiceCollection, factory func() TService) IServiceCollection {
-	return services.AddScoped(factory)
-}
-
 // AddTransient is a generic helper to add a transient service.
 func AddTransient[TService any](services IServiceCollection, factory func() TService) IServiceCollection {
 	return services.AddTransient(factory)
@@ -60,11 +55,6 @@ func AddTransient[TService any](services IServiceCollection, factory func() TSer
 // AddKeyedSingleton is a generic helper to add a keyed singleton service.
 func AddKeyedSingleton[TService any](services IServiceCollection, serviceKey string, factory func() TService) IServiceCollection {
 	return services.AddKeyedSingleton(serviceKey, factory)
-}
-
-// AddKeyedScoped is a generic helper to add a keyed scoped service.
-func AddKeyedScoped[TService any](services IServiceCollection, serviceKey string, factory func() TService) IServiceCollection {
-	return services.AddKeyedScoped(serviceKey, factory)
 }
 
 // AddKeyedTransient is a generic helper to add a keyed transient service.
@@ -77,11 +67,3 @@ func AddKeyedTransient[TService any](services IServiceCollection, serviceKey str
 func TypeOf[T any]() reflect.Type {
 	return reflect.TypeOf((*T)(nil)).Elem()
 }
-
-// GetServiceScopeFactory retrieves the IServiceScopeFactory from the provider.
-func GetServiceScopeFactory(provider IServiceProvider) IServiceScopeFactory {
-	var factory IServiceScopeFactory
-	provider.GetRequiredService(&factory)
-	return factory
-}
-

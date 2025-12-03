@@ -142,10 +142,11 @@ builder.Services.AddSingleton(NewGreeterService)
 
 将 `GreeterService` 注册为单例服务。工厂函数 `NewGreeterService` 会在第一次请求时调用，之后重用同一个实例。
 
-**三种生命周期**：
-- `AddSingleton` - 应用程序生命周期内只创建一次
-- `AddScoped` - 每个 HTTP 请求创建一次
-- `AddTransient` - 每次需要时都创建新实例
+**两种生命周期**：
+- `AddSingleton` - 应用程序生命周期内只创建一次（推荐用于无状态服务）
+- `AddTransient` - 每次需要时都创建新实例（用于有状态服务）
+
+**注意：** 框架不支持 Scoped 生命周期，采用更简单的设计模式。
 
 ### 3. 构建应用
 

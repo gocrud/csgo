@@ -5,16 +5,16 @@
 ## 🎯 演示的功能
 
 ### 1. 基础服务注册和解析
-- Singleton/Scoped/Transient 三种生命周期
+- Singleton/Transient 两种生命周期
 - 指针填充方案（类似 json.Unmarshal）
 
 ### 2. Keyed Services（命名服务）
 - 注册多个同类型服务
 - 通过 serviceKey 获取特定实现
 
-### 3. Scoped 生命周期
-- 不同作用域创建不同实例
-- 自动资源释放（Dispose）
+### 3. Transient 生命周期
+- 每次请求创建新实例
+- 适合无状态服务
 
 ### 4. TryGetService（可选服务）
 - 优雅处理服务不存在的情况
@@ -32,10 +32,6 @@
 - 检查服务是否已注册
 - 运行时服务发现
 
-### 8. IServiceScopeFactory
-- 作用域工厂模式
-- 符合 .NET 标准
-
 ## 🚀 运行示例
 
 ```bash
@@ -50,7 +46,7 @@ go run main.go
 services := di.NewServiceCollection()
 services.
     AddSingleton(NewLogger).
-    AddScoped(NewDatabase).
+    AddTransient(NewDatabase).
     AddTransient(NewService).
     AddKeyedSingleton("primary", NewPrimaryDb).
     AddKeyedSingleton("secondary", NewSecondaryDb)
@@ -78,16 +74,6 @@ provider.GetKeyedService(&primaryDb, "primary")
 // 方式 5：所有服务
 var databases []IDatabase
 provider.GetServices(&databases)
-```
-
-### 作用域使用
-```go
-scope := provider.CreateScope()
-defer scope.Dispose()
-
-scopedProvider := scope.ServiceProvider()
-var service IUserService
-scopedProvider.GetRequiredService(&service)
 ```
 
 ## ✨ 设计理念

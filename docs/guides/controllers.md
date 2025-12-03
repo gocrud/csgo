@@ -2,6 +2,37 @@
 
 本指南介绍如何使用 ASP.NET Core 风格的 Controller 模式来组织和构建 API。
 
+## ⚠️ 重要：控制器生命周期
+
+**Controllers 是单例的** - 在应用启动时创建一次，整个应用生命周期复用同一实例。
+
+```go
+// ✅ 推荐：无状态控制器
+type UserController struct {
+    userService UserService     // 依赖服务（不可变）
+    config      *AppConfig      // 配置（不可变）
+}
+
+// ❌ 错误：不要存储请求状态
+type BadController struct {
+    currentUser *User          // ❌ 多个请求会相互覆盖！
+    requestID   string         // ❌ 线程不安全！
+}
+```
+
+**为什么是单例？**
+- ✅ 符合 Go 生态习惯（Gin/Echo 都这样）
+- ✅ 性能最优（零运行时开销）
+- ✅ 代码简单（无复杂的作用域管理）
+
+**最佳实践：**
+1. Controllers 只负责路由和请求处理
+2. 业务逻辑放在服务层（服务可以是 Transient）
+3. 请求相关数据从 `HttpContext` 获取
+4. 使用 IOptions 模式注入配置
+
+---
+
 ## 目录
 
 - [什么是控制器模式](#什么是控制器模式)
@@ -182,6 +213,69 @@ func NewMyController(sp di.IServiceProvider, myService MyService) *MyController 
         ControllerBase: web.NewControllerBase(sp),
         myService:      myService,
     }
+}
+```
+
+### 使用配置（IOptions 模式）
+
+Controllers 可以注入配置：
+
+```go
+import "github.com/gocrud/csgo/configuration"
+
+// 定义配置
+type ProductSettings struct {
+    MaxPageSize  int  `json:"maxPageSize"`
+    CacheEnabled bool `json:"cacheEnabled"`
+}
+
+// Controller 中注入配置
+type ProductController struct {
+    productService ProductService
+    settings       *ProductSettings  // 配置快照
+}
+
+func NewProductController(app *web.WebApplication) *ProductController {
+    // 解析服务
+    productService := di.GetRequiredService[ProductService](app.Services)
+    
+    // 解析配置
+    settingsOpts := di.GetRequiredService[configuration.IOptions[ProductSettings]](app.Services)
+    
+    return &ProductController{
+        productService: productService,
+        settings:       settingsOpts.Value(),  // 获取配置值
+    }
+}
+
+func (c *ProductController) GetProducts(ctx *web.HttpContext) web.IActionResult {
+    // 使用配置
+    pageSize := ctx.QueryInt("pageSize", c.settings.MaxPageSize)
+    
+    if pageSize > c.settings.MaxPageSize {
+        return ctx.BadRequest(fmt.Sprintf("页大小不能超过 %d", c.settings.MaxPageSize))
+    }
+    
+    products := c.productService.GetAll(pageSize)
+    return ctx.Ok(products)
+}
+```
+
+**注册配置：**
+
+```go
+// main.go
+configuration.Configure[ProductSettings](builder.Services, builder.Configuration, "Product")
+```
+
+**appsettings.json：**
+
+```json
+{
+  "Product": {
+    "maxPageSize": 100,
+    "cacheEnabled": true
+  }
 }
 ```
 

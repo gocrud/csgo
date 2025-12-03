@@ -12,17 +12,11 @@ type IServiceCollection interface {
 	// AddSingleton registers a singleton service.
 	AddSingleton(constructor interface{}) IServiceCollection
 
-	// AddScoped registers a scoped service.
-	AddScoped(constructor interface{}) IServiceCollection
-
 	// AddTransient registers a transient service.
 	AddTransient(constructor interface{}) IServiceCollection
 
 	// TryAddSingleton attempts to add a singleton service if it doesn't exist.
 	TryAddSingleton(constructor interface{}) IServiceCollection
-
-	// TryAddScoped attempts to add a scoped service if it doesn't exist.
-	TryAddScoped(constructor interface{}) IServiceCollection
 
 	// TryAddTransient attempts to add a transient service if it doesn't exist.
 	TryAddTransient(constructor interface{}) IServiceCollection
@@ -37,10 +31,6 @@ type IServiceCollection interface {
 	// AddKeyedSingleton registers a keyed singleton service.
 	// Corresponds to .NET IServiceCollection.AddKeyedSingleton().
 	AddKeyedSingleton(serviceKey string, constructor interface{}) IServiceCollection
-
-	// AddKeyedScoped registers a keyed scoped service.
-	// Corresponds to .NET IServiceCollection.AddKeyedScoped().
-	AddKeyedScoped(serviceKey string, constructor interface{}) IServiceCollection
 
 	// AddKeyedTransient registers a keyed transient service.
 	// Corresponds to .NET IServiceCollection.AddKeyedTransient().
@@ -76,14 +66,6 @@ func (s *serviceCollection) AddSingleton(constructor interface{}) IServiceCollec
 	return s
 }
 
-// AddScoped registers a scoped service.
-func (s *serviceCollection) AddScoped(constructor interface{}) IServiceCollection {
-	if err := s.register(constructor, Scoped); err != nil {
-		panic(fmt.Sprintf("failed to register scoped service: %v", err))
-	}
-	return s
-}
-
 // AddTransient registers a transient service.
 func (s *serviceCollection) AddTransient(constructor interface{}) IServiceCollection {
 	if err := s.register(constructor, Transient); err != nil {
@@ -105,23 +87,6 @@ func (s *serviceCollection) TryAddSingleton(constructor interface{}) IServiceCol
 	returnType := ctorType.Out(0)
 	if !s.engine.Contains(returnType, "") {
 		s.AddSingleton(constructor)
-	}
-	return s
-}
-
-// TryAddScoped attempts to add a scoped service if it doesn't exist.
-func (s *serviceCollection) TryAddScoped(constructor interface{}) IServiceCollection {
-	ctorType := reflect.TypeOf(constructor)
-	if ctorType.Kind() != reflect.Func {
-		return s
-	}
-	if ctorType.NumOut() == 0 {
-		return s
-	}
-
-	returnType := ctorType.Out(0)
-	if !s.engine.Contains(returnType, "") {
-		s.AddScoped(constructor)
 	}
 	return s
 }
@@ -183,14 +148,6 @@ func (s *serviceCollection) AddKeyedSingleton(serviceKey string, constructor int
 	return s
 }
 
-// AddKeyedScoped registers a keyed scoped service.
-func (s *serviceCollection) AddKeyedScoped(serviceKey string, constructor interface{}) IServiceCollection {
-	if err := s.registerKeyed(constructor, Scoped, serviceKey); err != nil {
-		panic(fmt.Sprintf("failed to register keyed scoped service: %v", err))
-	}
-	return s
-}
-
 // AddKeyedTransient registers a keyed transient service.
 func (s *serviceCollection) AddKeyedTransient(serviceKey string, constructor interface{}) IServiceCollection {
 	if err := s.registerKeyed(constructor, Transient, serviceKey); err != nil {
@@ -206,17 +163,9 @@ func (s *serviceCollection) BuildServiceProvider(options ...ServiceProviderOptio
 		opt(opts)
 	}
 
-	// Register IServiceScopeFactory before compilation
-	// We'll add the factory instance directly to the provider after creation
 	provider := &serviceProvider{
-		engine:         s.engine,
-		validateScopes: opts.ValidateScopes,
+		engine: s.engine,
 	}
-
-	// Register the scope factory
-	s.AddSingleton(func() IServiceScopeFactory {
-		return NewServiceScopeFactory(provider)
-	})
 
 	if err := s.engine.Compile(); err != nil {
 		panic(fmt.Sprintf("failed to build service provider: %v", err))
@@ -265,8 +214,6 @@ func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLi
 	switch lifetime {
 	case Singleton:
 		internalLifetime = internal.Singleton
-	case Scoped:
-		internalLifetime = internal.Scoped
 	case Transient:
 		internalLifetime = internal.Transient
 	default:
@@ -315,8 +262,6 @@ func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime Serv
 	switch lifetime {
 	case Singleton:
 		internalLifetime = internal.Singleton
-	case Scoped:
-		internalLifetime = internal.Scoped
 	case Transient:
 		internalLifetime = internal.Transient
 	default:
@@ -336,19 +281,11 @@ func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime Serv
 
 // ServiceProviderOptions contains options for building a service provider.
 type ServiceProviderOptions struct {
-	ValidateScopes  bool
 	ValidateOnBuild bool
 }
 
 // ServiceProviderOption configures a ServiceProviderOptions.
 type ServiceProviderOption func(*ServiceProviderOptions)
-
-// WithValidateScopes enables scope validation.
-func WithValidateScopes(validate bool) ServiceProviderOption {
-	return func(opts *ServiceProviderOptions) {
-		opts.ValidateScopes = validate
-	}
-}
 
 // WithValidateOnBuild validates all services can be resolved during build.
 func WithValidateOnBuild(validate bool) ServiceProviderOption {

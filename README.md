@@ -7,7 +7,7 @@
 
 ## ✨ 核心特性
 
-- 🎯 **完整的依赖注入** - 类似 .NET 的服务注册（`AddSingleton`、`AddScoped`、`AddTransient`），Go 风格的指针填充解析
+- 🎯 **完整的依赖注入** - 类似 .NET 的服务注册（`AddSingleton`、`AddTransient`），Go 风格的指针填充解析
 - 🌐 **现代 Web 框架** - 基于 Gin，提供控制器模式、路由系统和中间件支持
 - 🎭 **HttpContext & ActionResult** - 类似 .NET 的请求处理模式，统一响应格式（`Ok`、`NotFound`、`BadRequest`）
 - 📦 **模块化设计** - 业务模块扩展方法，清晰的代码组织和依赖管理
@@ -81,27 +81,28 @@ go run main.go
 
 ### 依赖注入
 
-CSGO 提供了完整的 DI 容器，支持三种服务生命周期：
+CSGO 提供了完整的 DI 容器，支持两种服务生命周期：
 
 ```go
-// Singleton - 全局唯一实例
+// Singleton - 全局唯一实例（推荐用于无状态服务）
 services.AddSingleton(NewDatabaseConnection)
+services.AddSingleton(NewUserService)
 
-// Scoped - 每个请求一个实例
-services.AddScoped(NewUserContext)
-
-// Transient - 每次请求都创建新实例
+// Transient - 每次请求都创建新实例（用于有状态服务）
 services.AddTransient(NewEmailService)
+services.AddTransient(NewRequestLogger)
 
 // 服务解析（指针填充方式）
 var db *DatabaseConnection
 provider.GetRequiredService(&db)
 
-// 或使用泛型辅助方法
+// 或使用泛型辅助方法（推荐）
 db := di.GetRequiredService[*DatabaseConnection](provider)
 ```
 
-[查看完整 DI 指南 →](docs/guides/dependency-injection.md)
+**注意：** 框架采用简化设计，不支持 Scoped 生命周期。Controllers 是单例的，必须保持无状态。
+
+📖 [查看完整 DI 指南](docs/guides/dependency-injection.md) | [框架变更说明](docs/FRAMEWORK_CHANGES.md)
 
 ### Web 应用
 
@@ -196,8 +197,8 @@ package users
 
 // AddUserServices 注册用户模块的所有服务
 func AddUserServices(services di.IServiceCollection) {
-    services.AddScoped(NewUserService)
-    services.AddScoped(NewUserRepository)
+    services.AddTransient(NewUserService)
+    services.AddTransient(NewUserRepository)
     services.AddSingleton(NewUserCache)
 }
 
@@ -236,15 +237,21 @@ swagger.UseSwaggerUI(app)
 
 ## 📖 完整文档
 
+### 快速入门
 - [快速开始](docs/getting-started.md) - 安装和第一个应用
-- [用户指南](docs/guides/) - 详细的功能指南
-  - [Web 应用](docs/guides/web-applications.md) - Web 应用完整指南
-  - [控制器](docs/guides/controllers.md) - 控制器模式
-  - [依赖注入](docs/guides/dependency-injection.md) - DI 系统
-  - [配置管理](docs/guides/configuration.md) - 配置系统
-  - [应用托管](docs/guides/hosting.md) - 生命周期管理
-  - [业务模块](docs/guides/business-modules.md) - 模块化设计
-  - [API 文档](docs/guides/api-documentation.md) - Swagger 集成
+- **[快速参考](docs/QUICK_REFERENCE.md)** - 一页纸速查手册 📄
+- **[框架变更说明](docs/FRAMEWORK_CHANGES.md)** - 设计决策和最佳实践 🔄
+
+### 用户指南
+- [Web 应用](docs/guides/web-applications.md) - Web 应用完整指南
+- [控制器](docs/guides/controllers.md) - 控制器模式
+- [依赖注入](docs/guides/dependency-injection.md) - DI 系统
+- [配置管理](docs/guides/configuration.md) - 配置系统
+- [应用托管](docs/guides/hosting.md) - 生命周期管理
+- [业务模块](docs/guides/business-modules.md) - 模块化设计
+- [API 文档](docs/guides/api-documentation.md) - Swagger 集成
+
+### 参考资料
 - [API 参考](docs/api/) - 完整的 API 文档
 - [最佳实践](docs/best-practices.md) - 推荐的代码组织和模式
 - [与 .NET 对比](docs/comparison-with-dotnet.md) - API 对照和迁移指南

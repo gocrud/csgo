@@ -13,7 +13,6 @@ type ServiceLifetime int
 
 const (
 	Singleton ServiceLifetime = iota
-	Scoped
 	Transient
 )
 
@@ -156,7 +155,7 @@ func (e *Engine) Compile() error {
 	for _, key := range sorted {
 		reg := e.registrations[key]
 		if reg != nil && reg.Lifetime == Singleton {
-			instance, err := e.createInstance(reg, nil)
+			instance, err := e.createInstance(reg)
 			if err != nil {
 				return fmt.Errorf("failed to create singleton %v: %w", reg.ServiceType, err)
 			}
@@ -191,7 +190,7 @@ func (e *Engine) Resolve(serviceType reflect.Type, name string) (interface{}, er
 	}
 
 	// Transient 每次创建
-	return e.createInstance(reg, nil)
+	return e.createInstance(reg)
 }
 
 // ResolveAll 解析所有服务
@@ -217,8 +216,8 @@ func (e *Engine) ResolveAll(serviceType reflect.Type) ([]interface{}, error) {
 	return results, nil
 }
 
-// CreateInstance 创建实例
-func (e *Engine) createInstance(reg *Registration, scopeInstances map[RegistrationKey]interface{}) (interface{}, error) {
+// createInstance 创建实例
+func (e *Engine) createInstance(reg *Registration) (interface{}, error) {
 	// 解析依赖
 	args := make([]reflect.Value, len(reg.InputTypes))
 	for i, depType := range reg.InputTypes {
@@ -274,7 +273,7 @@ func (e *Engine) resolveDuringCompile(serviceType reflect.Type, name string) (in
 	}
 
 	// 递归创建实例
-	return e.createInstance(reg, nil)
+	return e.createInstance(reg)
 }
 
 // Contains 检查服务是否存在

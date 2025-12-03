@@ -10,7 +10,7 @@
 services := di.NewServiceCollection()
 services.
     AddSingleton(NewConsoleLogger).
-    AddScoped(NewUserService).
+    AddTransient(NewUserService).
     AddTransient(NewEmailNotificationService)
 ```
 
@@ -29,18 +29,7 @@ provider.GetRequiredService(&userService)
 - **获取所有**：`GetServices(&[]IService)`
 - **命名服务**：`GetKeyedService(&target, "key")`
 
-### 4. 作用域支持
-
-```go
-scope := provider.CreateScope()
-defer scope.Dispose()
-
-scopedProvider := scope.ServiceProvider()
-var service IUserService
-scopedProvider.GetRequiredService(&service)
-```
-
-### 5. 可选的泛型辅助方法
+### 4. 可选的泛型辅助方法
 
 ```go
 // 更简洁的语法
@@ -61,5 +50,5 @@ go run main.go
 2. ✅ **Go 习惯**：类似 `json.Unmarshal(&v)` 的API风格
 3. ✅ **IDE 友好**：自动补全和类型推导
 4. ✅ **简洁明了**：一行代码即可获取服务
-5. ✅ **支持 Scoped**：完整的三种生命周期支持
+5. ✅ **完整生命周期**：支持 Singleton 和 Transient 两种生命周期
 

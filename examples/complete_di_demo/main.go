@@ -142,7 +142,7 @@ func main() {
 		AddSingleton(func() ILogger { return NewConsoleLogger() }).
 		AddSingleton(func(logger ILogger) IDatabase { return NewPostgresDatabase(logger) }).
 		AddSingleton(func(logger ILogger) ICache { return NewRedisCache(logger) }).
-		AddScoped(func(logger ILogger, db IDatabase, cache ICache) IUserService {
+		AddTransient(func(logger ILogger, db IDatabase, cache ICache) IUserService {
 			return NewUserService(logger, db, cache)
 		})
 
@@ -184,36 +184,30 @@ func main() {
 	fmt.Println()
 
 	// ========================================
-	// 示例 3：Scoped 生命周期
+	// 示例 3：Transient 生命周期
 	// ========================================
-	fmt.Println("【示例 3】Scoped 生命周期 - 不同作用域不同实例")
+	fmt.Println("【示例 3】Transient 生命周期 - 每次创建新实例")
 	services3 := di.NewServiceCollection()
 	services3.
 		AddSingleton(func() ILogger { return NewConsoleLogger() }).
 		AddSingleton(func(logger ILogger) IDatabase { return NewPostgresDatabase(logger) }).
 		AddSingleton(func(logger ILogger) ICache { return NewRedisCache(logger) }).
-		AddScoped(func(logger ILogger, db IDatabase, cache ICache) IUserService {
+		AddTransient(func(logger ILogger, db IDatabase, cache ICache) IUserService {
 			return NewUserService(logger, db, cache)
 		})
 
 	provider3 := services3.BuildServiceProvider()
 	defer provider3.Dispose()
 
-	// 作用域 1
-	scope1 := provider3.CreateScope()
-	scopedProvider1 := scope1.ServiceProvider()
+	// 第一次获取
 	var userSvc1 IUserService
-	scopedProvider1.GetRequiredService(&userSvc1)
-	fmt.Printf("Scope 1: %s (地址: %p)\n", userSvc1.GetUser(10), userSvc1)
-	scope1.Dispose()
+	provider3.GetRequiredService(&userSvc1)
+	fmt.Printf("实例 1: %s (地址: %p)\n", userSvc1.GetUser(10), userSvc1)
 
-	// 作用域 2（不同实例）
-	scope2 := provider3.CreateScope()
-	scopedProvider2 := scope2.ServiceProvider()
+	// 第二次获取（不同实例）
 	var userSvc2 IUserService
-	scopedProvider2.GetRequiredService(&userSvc2)
-	fmt.Printf("Scope 2: %s (地址: %p)\n", userSvc2.GetUser(20), userSvc2)
-	scope2.Dispose()
+	provider3.GetRequiredService(&userSvc2)
+	fmt.Printf("实例 2: %s (地址: %p)\n", userSvc2.GetUser(20), userSvc2)
 	fmt.Println()
 
 	// ========================================
@@ -295,21 +289,7 @@ func main() {
 	}
 	fmt.Println()
 
-	// ========================================
-	// 示例 8：IServiceScopeFactory
-	// ========================================
-	fmt.Println("【示例 8】IServiceScopeFactory - 作用域工厂")
-	scopeFactory := di.GetServiceScopeFactory(provider3)
-
-	scope := scopeFactory.CreateScope()
-	defer scope.Dispose()
-
-	scopedProvider := scope.ServiceProvider()
-	var svc IUserService
-	scopedProvider.GetRequiredService(&svc)
-	fmt.Println("通过 ScopeFactory 创建:", svc.GetUser(100))
-
-	fmt.Println("\n========================================")
+	fmt.Println("========================================")
 	fmt.Println("演示完成！")
 	fmt.Println("========================================")
 }

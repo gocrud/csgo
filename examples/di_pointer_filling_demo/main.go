@@ -76,7 +76,7 @@ func main() {
 	// ===== 2. 注册服务（.NET 风格链式调用） =====
 	services.
 		AddSingleton(NewConsoleLogger).
-		AddScoped(NewUserService).
+		AddTransient(NewUserService).
 		AddTransient(NewEmailNotificationService).
 		AddTransient(NewSmsNotificationService)
 
@@ -123,27 +123,8 @@ func main() {
 	}
 	fmt.Println()
 
-	// ===== 示例 5：作用域使用 =====
-	fmt.Println("示例 5：作用域使用")
-	scope1 := provider.CreateScope()
-	defer scope1.Dispose()
-
-	scopedProvider1 := scope1.ServiceProvider()
-	var scopedUserService1 IUserService
-	scopedProvider1.GetRequiredService(&scopedUserService1)
-	fmt.Println("Scope 1:", scopedUserService1.GetUser(10))
-
-	scope2 := provider.CreateScope()
-	defer scope2.Dispose()
-
-	scopedProvider2 := scope2.ServiceProvider()
-	var scopedUserService2 IUserService
-	scopedProvider2.GetRequiredService(&scopedUserService2)
-	fmt.Println("Scope 2:", scopedUserService2.GetUser(20))
-	fmt.Println()
-
-	// ===== 示例 6：泛型辅助方法（可选） =====
-	fmt.Println("示例 6：泛型辅助方法")
+	// ===== 示例 5：泛型辅助方法（可选） =====
+	fmt.Println("示例 5：泛型辅助方法")
 	logger2, err := di.GetService[ILogger](provider)
 	if err != nil {
 		panic(err)

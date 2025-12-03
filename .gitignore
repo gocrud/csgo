@@ -29,7 +29,9 @@ go.work
 
 # Example binaries
 examples/business_module_demo/business_module_demo
+examples/complete_di_demo/complete_di_demo
 examples/controller_demo/controller_demo
+examples/di_pointer_filling_demo/di_pointer_filling_demo
 examples/service_resolution_demo/service_resolution_demo
 examples/web_api/web_api
 examples/worker_service/worker_service
