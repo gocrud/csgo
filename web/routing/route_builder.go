@@ -20,6 +20,10 @@ type IEndpointConventionBuilder interface {
 	// WithTags adds OpenAPI tags.
 	WithTags(tags ...string) IEndpointConventionBuilder
 
+	// WithOpenApi enables OpenAPI documentation for this endpoint.
+	// Corresponds to .NET endpoint.WithOpenApi().
+	WithOpenApi() IEndpointConventionBuilder
+
 	// RequireAuthorization adds authorization requirements.
 	RequireAuthorization(policies ...string) IEndpointConventionBuilder
 
@@ -39,6 +43,7 @@ type RouteBuilder struct {
 	metadata       []interface{}
 	authPolicies   []string
 	allowAnonymous bool
+	openApiEnabled bool
 }
 
 // NewRouteBuilder creates a new RouteBuilder.
@@ -85,6 +90,13 @@ func (b *RouteBuilder) WithDescription(description string) IEndpointConventionBu
 // WithTags adds OpenAPI tags.
 func (b *RouteBuilder) WithTags(tags ...string) IEndpointConventionBuilder {
 	b.tags = append(b.tags, tags...)
+	return b
+}
+
+// WithOpenApi enables OpenAPI documentation for this endpoint.
+// Corresponds to .NET endpoint.WithOpenApi().
+func (b *RouteBuilder) WithOpenApi() IEndpointConventionBuilder {
+	b.openApiEnabled = true
 	return b
 }
 
@@ -173,4 +185,9 @@ func (b *RouteBuilder) GetTags() []string {
 // GetMetadata returns all metadata.
 func (b *RouteBuilder) GetMetadata() []interface{} {
 	return b.metadata
+}
+
+// IsOpenApiEnabled returns whether OpenAPI documentation is enabled for this endpoint.
+func (b *RouteBuilder) IsOpenApiEnabled() bool {
+	return b.openApiEnabled
 }

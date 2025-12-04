@@ -142,6 +142,15 @@ func (g *RouteGroupBuilder) mapRoute(method, pattern string, handlers ...Handler
 	// Inherit group metadata
 	rb.metadata = append([]interface{}{}, g.metadata...)
 
+	// Inherit OpenAPI setting from group
+	// If the group has enabled OpenAPI, all child routes automatically inherit it
+	for _, meta := range g.metadata {
+		if openApiMeta, ok := meta.(*OpenApiMetadata); ok && openApiMeta.Enabled {
+			rb.openApiEnabled = true
+			break
+		}
+	}
+
 	// Store route
 	g.routes = append(g.routes, rb)
 

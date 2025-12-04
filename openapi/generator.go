@@ -67,6 +67,7 @@ type RouteInfo interface {
 	GetDescription() string
 	GetTags() []string
 	GetMetadata() []interface{}
+	IsOpenApiEnabled() bool
 }
 
 // Generate generates the OpenAPI specification.
@@ -87,8 +88,12 @@ func (g *Generator) Generate(routes []RouteInfo) *Specification {
 		Security: g.security,
 	}
 
+	// Only include routes that have explicitly enabled OpenAPI documentation
+	// Corresponds to .NET behavior where endpoints need .WithOpenApi() to be included
 	for _, route := range routes {
-		g.addRoute(spec, route)
+		if route.IsOpenApiEnabled() {
+			g.addRoute(spec, route)
+		}
 	}
 
 	return spec
