@@ -13,7 +13,7 @@
 ```go
 type WebApplication struct {
     host     hosting.IHost
-    Engine   *gin.Engine
+    engine   *gin.Engine  // Private: use app.Use() and app.Map*() methods
     Services di.IServiceProvider  // ✅ 强类型，完整提示
     routes   []*routing.RouteBuilder
     groups   []*routing.RouteGroupBuilder

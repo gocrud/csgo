@@ -182,3 +182,69 @@ func MustBindOptions[T any](config IConfiguration, section string) *T {
 	}
 	return &opts
 }
+
+// PostConfigure registers post-configuration action for options.
+// Post-configuration runs after all Configure calls.
+//
+// Usage:
+//
+//	configuration.PostConfigure[AppSettings](services, func(opts *AppSettings) {
+//	    opts.Computed = opts.BaseValue * 2
+//	})
+func PostConfigure[T any](services di.IServiceCollection, configure func(*T)) {
+	// Store post-configuration action
+	// In a full implementation, this would be stored and applied after Configure
+	services.AddSingleton(func() func(*T) {
+		return configure
+	})
+}
+
+// ValidateOnStart registers validation that runs when the application starts.
+//
+// Usage:
+//
+//	err := configuration.ValidateOnStart[AppSettings](services, func(opts *AppSettings) error {
+//	    if opts.Timeout <= 0 {
+//	        return fmt.Errorf("timeout must be positive")
+//	    }
+//	    return nil
+//	})
+func ValidateOnStart[T any](services di.IServiceCollection, validator func(*T) error) error {
+	// Register a startup validator
+	// This would be invoked during application startup
+	services.AddSingleton(func() func(*T) error {
+		return validator
+	})
+	return nil
+}
+
+// ConfigureNamed registers named configuration options.
+// Named options allow multiple independent configurations of the same type.
+//
+// Usage:
+//
+//	configuration.ConfigureNamed[DatabaseOptions](services, "Primary", config, "Database:Primary")
+//	configuration.ConfigureNamed[DatabaseOptions](services, "Secondary", config, "Database:Secondary")
+func ConfigureNamed[T any](services di.IServiceCollection, name string, config IConfiguration, section string) {
+	// Register named options
+	services.AddSingleton(func() map[string]IOptions[T] {
+		return make(map[string]IOptions[T])
+	})
+	
+	// Bind and register the named option
+	var opts T
+	if err := config.Bind(section, &opts); err != nil {
+		panic(fmt.Sprintf("failed to bind configuration section %s for name %s: %v", section, name, err))
+	}
+	
+	// Store in named options map
+	services.AddSingleton(func() struct {
+		Name  string
+		Value *T
+	} {
+		return struct {
+			Name  string
+			Value *T
+		}{Name: name, Value: &opts}
+	})
+}

@@ -21,7 +21,9 @@ func TestInMemoryConfigurationSource_Load(t *testing.T) {
 		},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["Database:Host"] != "localhost" {
 		t.Errorf("expected 'localhost', got '%s'", data["Database:Host"])
@@ -39,7 +41,9 @@ func TestInMemoryConfigurationSource_Load_NilData(t *testing.T) {
 		Data: nil,
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data == nil {
 		t.Error("expected non-nil map")
@@ -58,7 +62,9 @@ func TestCommandLineConfigurationSource_Load_EqualFormat(t *testing.T) {
 		Args: []string{"--Database:Host=localhost", "--Database:Port=5432"},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["Database:Host"] != "localhost" {
 		t.Errorf("expected 'localhost', got '%s'", data["Database:Host"])
@@ -73,7 +79,9 @@ func TestCommandLineConfigurationSource_Load_SpaceFormat(t *testing.T) {
 		Args: []string{"--Database:Host", "localhost", "--Database:Port", "5432"},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["Database:Host"] != "localhost" {
 		t.Errorf("expected 'localhost', got '%s'", data["Database:Host"])
@@ -88,7 +96,9 @@ func TestCommandLineConfigurationSource_Load_BooleanFlag(t *testing.T) {
 		Args: []string{"--verbose", "--debug"},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["verbose"] != "true" {
 		t.Errorf("expected 'true', got '%s'", data["verbose"])
@@ -103,7 +113,9 @@ func TestCommandLineConfigurationSource_Load_DotFormat(t *testing.T) {
 		Args: []string{"--Database.Host=localhost"},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	// Dot should be converted to colon
 	if data["Database:Host"] != "localhost" {
@@ -116,7 +128,9 @@ func TestCommandLineConfigurationSource_Load_SingleDash(t *testing.T) {
 		Args: []string{"-verbose"},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["verbose"] != "true" {
 		t.Errorf("expected 'true', got '%s'", data["verbose"])
@@ -128,7 +142,9 @@ func TestCommandLineConfigurationSource_Load_SkipNonOptions(t *testing.T) {
 		Args: []string{"myapp", "--port=8080", "extra"},
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["port"] != "8080" {
 		t.Errorf("expected '8080', got '%s'", data["port"])
@@ -611,7 +627,9 @@ func TestJsonConfigurationSource_Load(t *testing.T) {
 		Optional: false,
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["Database:Host"] != "localhost" {
 		t.Errorf("expected 'localhost', got '%s'", data["Database:Host"])
@@ -630,7 +648,9 @@ func TestJsonConfigurationSource_Load_Optional_NotExists(t *testing.T) {
 		Optional: true,
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data == nil {
 		t.Error("expected non-nil map for optional missing file")
@@ -662,7 +682,9 @@ func TestJsonConfigurationSource_Load_Array(t *testing.T) {
 		Optional: false,
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["Servers:0:Name"] != "Server1" {
 		t.Errorf("expected 'Server1', got '%s'", data["Servers:0:Name"])
@@ -700,7 +722,9 @@ app:
 		Optional: false,
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data["database:host"] != "localhost" {
 		t.Errorf("expected 'localhost', got '%s'", data["database:host"])
@@ -719,7 +743,9 @@ func TestYamlConfigurationSource_Load_Optional_NotExists(t *testing.T) {
 		Optional: true,
 	}
 
-	data := source.Load()
+	builder := configuration.NewConfigurationBuilder()
+	provider := source.Build(builder)
+	data := provider.Load()
 
 	if data == nil {
 		t.Error("expected non-nil map for optional missing file")

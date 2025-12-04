@@ -8,12 +8,14 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gocrud/csgo/di"
 )
 
 // IHost represents a configured application ready to run.
 type IHost interface {
 	// Services returns the service provider.
-	Services() interface{}
+	Services() di.IServiceProvider
 
 	// Start starts the host.
 	Start(ctx context.Context) error
@@ -30,14 +32,31 @@ type IHost interface {
 
 // Host is the default implementation of IHost.
 type Host struct {
-	services       interface{}
-	environment    *Environment
-	lifetime       IHostApplicationLifetime
-	hostedServices []IHostedService
+	services        di.IServiceProvider
+	environment     *Environment
+	lifetime        IHostApplicationLifetime
+	hostedServices  []IHostedService
+	shutdownTimeout time.Duration
+}
+
+// NewHost creates a new Host instance.
+func NewHost(services di.IServiceProvider, environment *Environment, lifetime IHostApplicationLifetime, hostedServices []IHostedService) *Host {
+	return NewHostWithTimeout(services, environment, lifetime, hostedServices, 30*time.Second)
+}
+
+// NewHostWithTimeout creates a new Host instance with custom shutdown timeout.
+func NewHostWithTimeout(services di.IServiceProvider, environment *Environment, lifetime IHostApplicationLifetime, hostedServices []IHostedService, shutdownTimeout time.Duration) *Host {
+	return &Host{
+		services:        services,
+		environment:     environment,
+		lifetime:        lifetime,
+		hostedServices:  hostedServices,
+		shutdownTimeout: shutdownTimeout,
+	}
 }
 
 // Services returns the service provider.
-func (h *Host) Services() interface{} {
+func (h *Host) Services() di.IServiceProvider {
 	return h.services
 }
 
@@ -122,10 +141,9 @@ func (h *Host) RunAsync(ctx context.Context) error {
 		fmt.Println("\nApplication stopping requested")
 	}
 
-	// Stop the host with timeout
-	stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Stop the host with configured timeout
+	stopCtx, cancel := context.WithTimeout(context.Background(), h.shutdownTimeout)
 	defer cancel()
 
 	return h.Stop(stopCtx)
 }
-

@@ -11,31 +11,21 @@ import (
 	"vertical_slice_demo/shared/services/notification"
 	"vertical_slice_demo/shared/services/payment"
 
-	"github.com/gocrud/csgo/configuration"
 	"github.com/gocrud/csgo/web"
 )
 
 // Bootstrap 启动管理端应用
 func Bootstrap() *web.WebApplication {
 	builder := web.CreateBuilder()
-
 	// 构建配置（使用框架的配置系统）
-	config := configuration.NewConfigurationBuilder().
+	builder.Configuration.
 		AddJsonFile("configs/config.dev.json", true, false).
 		AddEnvironmentVariables("APP_").
 		Build()
 
 	// 绑定配置到结构体
 	var appConfig configs.Config
-	config.Bind("", &appConfig)
-
-	// 注册配置到 DI 容器
-	builder.Services.AddSingleton(func() configuration.IConfiguration {
-		return config
-	})
-	builder.Services.AddSingleton(func() *configs.Config {
-		return &appConfig
-	})
+	builder.Configuration.Bind("", &appConfig)
 
 	// 注册共享基础设施
 	database.AddDatabase(builder.Services)

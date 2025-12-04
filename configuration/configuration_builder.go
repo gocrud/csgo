@@ -15,6 +15,15 @@ type IConfigurationBuilder interface {
 	// AddYamlFile adds a YAML configuration source.
 	AddYamlFile(path string, optional bool, reloadOnChange bool) IConfigurationBuilder
 
+	// AddIniFile adds an INI configuration source.
+	AddIniFile(path string, optional bool, reloadOnChange bool) IConfigurationBuilder
+
+	// AddXmlFile adds an XML configuration source.
+	AddXmlFile(path string, optional bool, reloadOnChange bool) IConfigurationBuilder
+
+	// AddKeyPerFile adds a key-per-file configuration source.
+	AddKeyPerFile(directoryPath string, optional bool) IConfigurationBuilder
+
 	// AddEnvironmentVariables adds environment variables as a configuration source.
 	AddEnvironmentVariables(prefix string) IConfigurationBuilder
 
@@ -24,19 +33,34 @@ type IConfigurationBuilder interface {
 	// AddInMemoryCollection adds an in-memory collection as a configuration source.
 	AddInMemoryCollection(data map[string]string) IConfigurationBuilder
 
+	// SetBasePath sets the base path for file-based configuration sources.
+	SetBasePath(basePath string) IConfigurationBuilder
+
+	// GetBasePath gets the base path for file-based configuration sources.
+	GetBasePath() string
+
+	// Properties returns the shared properties dictionary.
+	Properties() map[string]interface{}
+
+	// Sources returns the configuration sources.
+	Sources() []IConfigurationSource
+
 	// Build builds the configuration.
 	Build() IConfiguration
 }
 
 // ConfigurationBuilder is the default implementation of IConfigurationBuilder.
 type ConfigurationBuilder struct {
-	sources []IConfigurationSource
+	sources    []IConfigurationSource
+	basePath   string
+	properties map[string]interface{}
 }
 
 // NewConfigurationBuilder creates a new configuration builder.
 func NewConfigurationBuilder() IConfigurationBuilder {
 	return &ConfigurationBuilder{
-		sources: make([]IConfigurationSource, 0),
+		sources:    make([]IConfigurationSource, 0),
+		properties: make(map[string]interface{}),
 	}
 }
 
@@ -56,6 +80,35 @@ func (b *ConfigurationBuilder) AddYamlFile(path string, optional bool, reloadOnC
 		Path:           path,
 		Optional:       optional,
 		ReloadOnChange: reloadOnChange,
+	})
+	return b
+}
+
+// AddIniFile adds an INI configuration source.
+func (b *ConfigurationBuilder) AddIniFile(path string, optional bool, reloadOnChange bool) IConfigurationBuilder {
+	b.sources = append(b.sources, &IniConfigurationSource{
+		Path:           path,
+		Optional:       optional,
+		ReloadOnChange: reloadOnChange,
+	})
+	return b
+}
+
+// AddXmlFile adds an XML configuration source.
+func (b *ConfigurationBuilder) AddXmlFile(path string, optional bool, reloadOnChange bool) IConfigurationBuilder {
+	b.sources = append(b.sources, &XmlConfigurationSource{
+		Path:           path,
+		Optional:       optional,
+		ReloadOnChange: reloadOnChange,
+	})
+	return b
+}
+
+// AddKeyPerFile adds a key-per-file configuration source.
+func (b *ConfigurationBuilder) AddKeyPerFile(directoryPath string, optional bool) IConfigurationBuilder {
+	b.sources = append(b.sources, &KeyPerFileConfigurationSource{
+		DirectoryPath: directoryPath,
+		Optional:      optional,
 	})
 	return b
 }
@@ -84,33 +137,44 @@ func (b *ConfigurationBuilder) AddInMemoryCollection(data map[string]string) ICo
 	return b
 }
 
+// SetBasePath sets the base path for file-based configuration sources.
+func (b *ConfigurationBuilder) SetBasePath(basePath string) IConfigurationBuilder {
+	b.basePath = basePath
+	return b
+}
+
+// GetBasePath gets the base path for file-based configuration sources.
+func (b *ConfigurationBuilder) GetBasePath() string {
+	return b.basePath
+}
+
+// Properties returns the shared properties dictionary.
+func (b *ConfigurationBuilder) Properties() map[string]interface{} {
+	return b.properties
+}
+
+// Sources returns the configuration sources.
+func (b *ConfigurationBuilder) Sources() []IConfigurationSource {
+	result := make([]IConfigurationSource, len(b.sources))
+	copy(result, b.sources)
+	return result
+}
+
 // Build builds the configuration.
 func (b *ConfigurationBuilder) Build() IConfiguration {
-	config := NewConfiguration().(*Configuration)
-
-	// Load all sources
+	// Build providers from sources
+	providers := make([]IConfigurationProvider, 0, len(b.sources))
 	for _, source := range b.sources {
-		data := source.Load()
-		for k, v := range data {
-			config.Set(k, v)
-		}
-
-		// Setup file watching for reload
-		if watcher, ok := source.(IReloadableSource); ok {
-			watcher.StartWatching(func(newData map[string]string) {
-				for k, v := range newData {
-					config.Set(k, v)
-				}
-			})
-		}
+		providers = append(providers, source.Build(b))
 	}
 
-	return config
+	return NewConfigurationRoot(providers)
 }
 
 // IConfigurationSource represents a source of configuration key/values.
 type IConfigurationSource interface {
-	Load() map[string]string
+	// Build builds an IConfigurationProvider from the source.
+	Build(builder IConfigurationBuilder) IConfigurationProvider
 }
 
 // IReloadableSource represents a configuration source that supports reloading.
@@ -124,11 +188,28 @@ type JsonConfigurationSource struct {
 	Path           string
 	Optional       bool
 	ReloadOnChange bool
-	watcher        *FileWatcher
+}
+
+// Build builds an IConfigurationProvider from the JSON source.
+func (s *JsonConfigurationSource) Build(builder IConfigurationBuilder) IConfigurationProvider {
+	return &JsonConfigurationProvider{
+		source: s,
+	}
+}
+
+// JsonConfigurationProvider is a provider for JSON configuration files.
+type JsonConfigurationProvider struct {
+	*ConfigurationProvider
+	source  *JsonConfigurationSource
+	watcher *FileWatcher
 }
 
 // Load loads configuration from JSON file.
-func (s *JsonConfigurationSource) Load() map[string]string {
+func (p *JsonConfigurationProvider) Load() map[string]string {
+	s := p.source
+	if p.ConfigurationProvider == nil {
+		p.ConfigurationProvider = NewConfigurationProvider()
+	}
 	data := make(map[string]string)
 
 	content, err := os.ReadFile(s.Path)
@@ -153,28 +234,18 @@ func (s *JsonConfigurationSource) Load() map[string]string {
 	// Flatten to key:value format
 	flattenMap("", jsonData, data)
 
+	// Store data in base provider
+	p.SetData(data)
+
+	// Setup file watching if enabled
+	if s.ReloadOnChange && p.watcher == nil {
+		p.watcher = NewFileWatcher(s.Path, func() {
+			newData := p.Load()
+			p.SetData(newData)
+		})
+	}
+
 	return data
-}
-
-// StartWatching starts watching for file changes.
-func (s *JsonConfigurationSource) StartWatching(callback func(map[string]string)) {
-	if !s.ReloadOnChange {
-		return
-	}
-
-	s.watcher = NewFileWatcher(s.Path, func() {
-		newData := s.Load()
-		if callback != nil {
-			callback(newData)
-		}
-	})
-}
-
-// StopWatching stops watching for file changes.
-func (s *JsonConfigurationSource) StopWatching() {
-	if s.watcher != nil {
-		s.watcher.Stop()
-	}
 }
 
 // YamlConfigurationSource represents a YAML file configuration source.
@@ -182,11 +253,28 @@ type YamlConfigurationSource struct {
 	Path           string
 	Optional       bool
 	ReloadOnChange bool
-	watcher        *FileWatcher
+}
+
+// Build builds an IConfigurationProvider from the YAML source.
+func (s *YamlConfigurationSource) Build(builder IConfigurationBuilder) IConfigurationProvider {
+	return &YamlConfigurationProvider{
+		source: s,
+	}
+}
+
+// YamlConfigurationProvider is a provider for YAML configuration files.
+type YamlConfigurationProvider struct {
+	*ConfigurationProvider
+	source  *YamlConfigurationSource
+	watcher *FileWatcher
 }
 
 // Load loads configuration from YAML file.
-func (s *YamlConfigurationSource) Load() map[string]string {
+func (p *YamlConfigurationProvider) Load() map[string]string {
+	s := p.source
+	if p.ConfigurationProvider == nil {
+		p.ConfigurationProvider = NewConfigurationProvider()
+	}
 	data := make(map[string]string)
 
 	content, err := os.ReadFile(s.Path)
@@ -205,28 +293,18 @@ func (s *YamlConfigurationSource) Load() map[string]string {
 	yamlData := parseSimpleYaml(content)
 	flattenMap("", yamlData, data)
 
+	// Store data in base provider
+	p.SetData(data)
+
+	// Setup file watching if enabled
+	if s.ReloadOnChange && p.watcher == nil {
+		p.watcher = NewFileWatcher(s.Path, func() {
+			newData := p.Load()
+			p.SetData(newData)
+		})
+	}
+
 	return data
-}
-
-// StartWatching starts watching for file changes.
-func (s *YamlConfigurationSource) StartWatching(callback func(map[string]string)) {
-	if !s.ReloadOnChange {
-		return
-	}
-
-	s.watcher = NewFileWatcher(s.Path, func() {
-		newData := s.Load()
-		if callback != nil {
-			callback(newData)
-		}
-	})
-}
-
-// StopWatching stops watching for file changes.
-func (s *YamlConfigurationSource) StopWatching() {
-	if s.watcher != nil {
-		s.watcher.Stop()
-	}
 }
 
 // parseSimpleYaml provides basic YAML parsing for simple key-value configs.
@@ -290,11 +368,29 @@ func setNestedValue(m map[string]interface{}, path []string, value string) {
 
 // EnvironmentVariablesConfigurationSource represents environment variables configuration source.
 type EnvironmentVariablesConfigurationSource struct {
-	Prefix string
+	Prefix       string
+	KeyDelimiter string // Custom delimiter for key separator, defaults to "__"
+}
+
+// Build builds an IConfigurationProvider from the environment variables source.
+func (s *EnvironmentVariablesConfigurationSource) Build(builder IConfigurationBuilder) IConfigurationProvider {
+	provider := &EnvironmentVariablesConfigurationProvider{
+		source: s,
+	}
+	provider.ConfigurationProvider = NewConfigurationProvider()
+	provider.Load()
+	return provider
+}
+
+// EnvironmentVariablesConfigurationProvider is a provider for environment variables.
+type EnvironmentVariablesConfigurationProvider struct {
+	*ConfigurationProvider
+	source *EnvironmentVariablesConfigurationSource
 }
 
 // Load loads configuration from environment variables.
-func (s *EnvironmentVariablesConfigurationSource) Load() map[string]string {
+func (p *EnvironmentVariablesConfigurationProvider) Load() map[string]string {
+	s := p.source
 	data := make(map[string]string)
 
 	for _, env := range os.Environ() {
@@ -314,27 +410,54 @@ func (s *EnvironmentVariablesConfigurationSource) Load() map[string]string {
 		}
 
 		// Convert environment variable format to configuration key format
-		// APP_Database__Host -> Database:Host
-		// APP_Database_Host  -> Database:Host (single underscore also supported)
-		key = strings.ReplaceAll(key, "__", ":")
-		// Only convert single underscore if no double underscore was present
-		if !strings.Contains(key, ":") {
+		// Default delimiter is "__": APP_Database__Host -> Database:Host
+		// Custom delimiter can be specified
+		delimiter := s.KeyDelimiter
+		if delimiter == "" {
+			delimiter = "__"
+		}
+
+		key = strings.ReplaceAll(key, delimiter, ":")
+
+		// Also support single underscore if delimiter is not single underscore
+		if delimiter != "_" && !strings.Contains(key, ":") {
 			key = strings.ReplaceAll(key, "_", ":")
 		}
 
 		data[key] = value
 	}
 
+	// Store data in base provider
+	p.SetData(data)
+
 	return data
 }
 
 // CommandLineConfigurationSource represents command line arguments configuration source.
 type CommandLineConfigurationSource struct {
-	Args []string
+	Args           []string
+	SwitchMappings map[string]string // Maps short options to full keys, e.g. {"-p": "Port"}
+}
+
+// Build builds an IConfigurationProvider from the command line source.
+func (s *CommandLineConfigurationSource) Build(builder IConfigurationBuilder) IConfigurationProvider {
+	provider := &CommandLineConfigurationProvider{
+		source: s,
+	}
+	provider.ConfigurationProvider = NewConfigurationProvider()
+	provider.Load()
+	return provider
+}
+
+// CommandLineConfigurationProvider is a provider for command line arguments.
+type CommandLineConfigurationProvider struct {
+	*ConfigurationProvider
+	source *CommandLineConfigurationSource
 }
 
 // Load loads configuration from command line arguments.
-func (s *CommandLineConfigurationSource) Load() map[string]string {
+func (p *CommandLineConfigurationProvider) Load() map[string]string {
+	s := p.source
 	data := make(map[string]string)
 
 	for i := 0; i < len(s.Args); i++ {
@@ -345,6 +468,7 @@ func (s *CommandLineConfigurationSource) Load() map[string]string {
 			continue
 		}
 
+		originalArg := arg
 		// Remove prefix
 		arg = strings.TrimLeft(arg, "-")
 
@@ -367,11 +491,22 @@ func (s *CommandLineConfigurationSource) Load() map[string]string {
 			}
 		}
 
+		// Check for switch mappings (e.g., -p -> Port)
+		if s.SwitchMappings != nil {
+			// Try with original prefix
+			if mapped, ok := s.SwitchMappings[originalArg]; ok {
+				key = mapped
+			}
+		}
+
 		// Normalize key format (support Database.Host or Database:Host)
 		key = strings.ReplaceAll(key, ".", ":")
 
 		data[key] = value
 	}
+
+	// Store data in base provider
+	p.SetData(data)
 
 	return data
 }
@@ -381,11 +516,32 @@ type InMemoryConfigurationSource struct {
 	Data map[string]string
 }
 
+// Build builds an IConfigurationProvider from the in-memory source.
+func (s *InMemoryConfigurationSource) Build(builder IConfigurationBuilder) IConfigurationProvider {
+	provider := &InMemoryConfigurationProvider{
+		source: s,
+	}
+	provider.ConfigurationProvider = NewConfigurationProvider()
+	provider.Load()
+	return provider
+}
+
+// InMemoryConfigurationProvider is a provider for in-memory configuration.
+type InMemoryConfigurationProvider struct {
+	*ConfigurationProvider
+	source *InMemoryConfigurationSource
+}
+
 // Load returns the in-memory configuration data.
-func (s *InMemoryConfigurationSource) Load() map[string]string {
+func (p *InMemoryConfigurationProvider) Load() map[string]string {
+	s := p.source
 	if s.Data == nil {
 		return make(map[string]string)
 	}
+
+	// Store data in base provider
+	p.SetData(s.Data)
+
 	return s.Data
 }
 

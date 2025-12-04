@@ -79,7 +79,6 @@ func (b *WebApplicationBuilder) Build() *WebApplication
 | 属性 | 类型 | 说明 |
 |------|------|------|
 | `Services` | `di.IServiceProvider` | 服务提供者 |
-| `Engine` | `*gin.Engine` | Gin 引擎（高级用法） |
 
 ---
 

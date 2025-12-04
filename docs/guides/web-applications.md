@@ -208,7 +208,6 @@ app := builder.Build()
 | 属性 | 类型 | 说明 |
 |------|------|------|
 | `Services` | `di.IServiceProvider` | 服务提供者 |
-| `Engine` | `*gin.Engine` | Gin 引擎（高级用法） |
 
 ### 运行应用
 
@@ -738,25 +737,25 @@ app.MapControllers()
 ```go
 app := builder.Build()
 
-// 单个目录
-app.Engine.Static("/static", "./public")
-
-// 单个文件
-app.Engine.StaticFile("/favicon.ico", "./resources/favicon.ico")
-
-// 文件服务器
-app.Engine.StaticFS("/files", http.Dir("./uploads"))
+// 使用 UseStaticFiles 方法
+app.UseStaticFiles(func(opts *web.StaticFileOptions) {
+    opts.RequestPath = "/static"
+    opts.FileSystem = "./public"
+})
 ```
 
 ### SPA 支持
 
 ```go
 // 为 SPA 应用提供前端文件
-app.Engine.Static("/", "./frontend/dist")
+app.UseStaticFiles(func(opts *web.StaticFileOptions) {
+    opts.RequestPath = "/"
+    opts.FileSystem = "./frontend/dist"
+})
 
 // 处理 SPA 路由（所有未匹配的路由返回 index.html）
-app.Engine.NoRoute(func(c *gin.Context) {
-    c.File("./frontend/dist/index.html")
+app.MapGet("/{catchAll}", func(c *web.HttpContext) web.IActionResult {
+    return web.File("./frontend/dist/index.html")
 })
 ```
 

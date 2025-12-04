@@ -20,6 +20,16 @@ type IOptionsMonitor[T any] interface {
 	OnChange(listener func(*T, string))
 }
 
+// IOptionsSnapshot is used to access options at the time of request.
+// This is a scoped service and is recomputed on each request.
+type IOptionsSnapshot[T any] interface {
+	// Value returns the configured value.
+	Value() *T
+
+	// Get returns the configured value for the specified name.
+	Get(name string) *T
+}
+
 // Options implements IOptions[T].
 type Options[T any] struct {
 	value *T
@@ -83,5 +93,51 @@ func (m *OptionsMonitor[T]) Set(value *T) {
 	for _, listener := range listeners {
 		listener(value, "")
 	}
+}
+
+// OptionsSnapshot implements IOptionsSnapshot[T].
+// It provides a snapshot of options at the time of request.
+type OptionsSnapshot[T any] struct {
+	value *T
+	named map[string]*T
+	mu    sync.RWMutex
+}
+
+// NewOptionsSnapshot creates a new OptionsSnapshot instance.
+func NewOptionsSnapshot[T any](value *T) IOptionsSnapshot[T] {
+	return &OptionsSnapshot[T]{
+		value: value,
+		named: make(map[string]*T),
+	}
+}
+
+// Value returns the configured value.
+func (s *OptionsSnapshot[T]) Value() *T {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.value
+}
+
+// Get returns the configured value for the specified name.
+func (s *OptionsSnapshot[T]) Get(name string) *T {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	if name == "" {
+		return s.value
+	}
+	
+	if val, ok := s.named[name]; ok {
+		return val
+	}
+	
+	return s.value
+}
+
+// SetNamed sets a named option value.
+func (s *OptionsSnapshot[T]) SetNamed(name string, value *T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.named[name] = value
 }
 

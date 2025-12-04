@@ -11,15 +11,21 @@ import (
 
 // WebApplication represents the configured web application.
 type WebApplication struct {
-	host     hosting.IHost
-	Engine   *gin.Engine
-	Services di.IServiceProvider // ✅ 直接暴露，强类型
-	routes   []*routing.RouteBuilder
-	groups   []*routing.RouteGroupBuilder
+	host        hosting.IHost
+	engine      *gin.Engine
+	Services    di.IServiceProvider // ✅ 直接暴露，强类型
+	routes      []*routing.RouteBuilder
+	groups      []*routing.RouteGroupBuilder
+	runtimeUrls *[]string // Pointer to runtime URLs (shared with HttpServer)
 }
 
 // Run runs the web application and blocks until shutdown.
+// If urls are provided, they override the configured listen addresses.
+// Corresponds to .NET app.Run(url).
 func (app *WebApplication) Run(urls ...string) error {
+	if len(urls) > 0 && app.runtimeUrls != nil {
+		*app.runtimeUrls = urls
+	}
 	return app.host.Run()
 }
 
@@ -40,7 +46,7 @@ func (app *WebApplication) Stop(ctx context.Context) error {
 
 // Use adds middleware to the pipeline.
 func (app *WebApplication) Use(middleware ...gin.HandlerFunc) {
-	app.Engine.Use(middleware...)
+	app.engine.Use(middleware...)
 }
 
 // MapGet registers a GET endpoint.
@@ -97,7 +103,7 @@ func (app *WebApplication) MapGroup(prefix string, handlers ...Handler) *routing
 	// Convert handlers for group middleware
 	ginHandlers := ToGinHandlers(handlers...)
 
-	ginGroup := app.Engine.Group(prefix, ginHandlers...)
+	ginGroup := app.engine.Group(prefix, ginHandlers...)
 	group := routing.NewRouteGroupBuilder(ginGroup, prefix)
 
 	// Set handler converter so group routes can use custom handler types
@@ -113,7 +119,7 @@ func (app *WebApplication) mapRoute(method, pattern string, handlers ...Handler)
 	ginHandlers := ToGinHandlers(handlers...)
 
 	// Register with Gin
-	app.Engine.Handle(method, pattern, ginHandlers...)
+	app.engine.Handle(method, pattern, ginHandlers...)
 
 	// Create route builder
 	rb := routing.NewRouteBuilder(method, pattern)

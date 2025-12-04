@@ -18,14 +18,14 @@ func (app *WebApplication) UseStaticFiles(configure ...func(*StaticFileOptions))
 		configure[0](opts)
 	}
 
-	app.Engine.Static(opts.RequestPath, opts.FileSystem)
+	app.engine.Static(opts.RequestPath, opts.FileSystem)
 	return app
 }
 
 // UseDefaultFiles enables default file mapping.
 // Corresponds to .NET app.UseDefaultFiles().
 func (app *WebApplication) UseDefaultFiles() *WebApplication {
-	app.Engine.StaticFile("/", "./wwwroot/index.html")
+	app.engine.StaticFile("/", "./wwwroot/index.html")
 	return app
 }
 

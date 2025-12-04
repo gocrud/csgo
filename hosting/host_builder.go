@@ -1,8 +1,12 @@
 package hosting
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/gocrud/csgo/configuration"
 	"github.com/gocrud/csgo/di"
+	"github.com/gocrud/csgo/logging"
 )
 
 // IHostBuilder provides a mechanism for configuring and creating a host.
@@ -17,9 +21,10 @@ type IHostBuilder interface {
 // Corresponds to .NET HostBuilder.
 type HostBuilder struct {
 	// Public properties (exposed like .NET)
-	Services      di.IServiceCollection
-	Configuration configuration.IConfiguration
-	Environment   *Environment
+	Services             di.IServiceCollection
+	Configuration        configuration.IConfigurationManager
+	Environment          *Environment
+	configurationActions []func(configuration.IConfigurationBuilder)
 }
 
 // CreateDefaultBuilder creates a host builder with default configuration.
@@ -27,27 +32,34 @@ type HostBuilder struct {
 func CreateDefaultBuilder(args ...string) *HostBuilder {
 	env := NewEnvironment()
 
-	// Build configuration
-	configBuilder := configuration.NewConfigurationBuilder().
+	// Create ConfigurationManager (allows dynamic configuration)
+	configManager := configuration.NewConfigurationManager()
+
+	// Add default configuration sources
+	configManager.
 		AddJsonFile("appsettings.json", true, true).
 		AddJsonFile("appsettings."+env.Name()+".json", true, true).
 		AddEnvironmentVariables("").
 		AddCommandLine(args)
 
-	config := configBuilder.Build()
-
 	// Create service collection
 	services := di.NewServiceCollection()
 
 	// Register core services
-	services.AddSingleton(func() configuration.IConfiguration { return config })
+	services.AddSingleton(func() configuration.IConfiguration { return configManager })
+	services.AddSingleton(func() configuration.IConfigurationManager { return configManager })
 	services.AddSingleton(func() *Environment { return env })
 	services.AddSingleton(func() IHostApplicationLifetime { return NewApplicationLifetime() })
 
+	// Register logging services by default (like .NET)
+	// This will read configuration from appsettings.json automatically
+	addDefaultLogging(services, configManager, env)
+
 	return &HostBuilder{
-		Services:      services,
-		Configuration: config,
-		Environment:   env,
+		Services:             services,
+		Configuration:        configManager,
+		Environment:          env,
+		configurationActions: make([]func(configuration.IConfigurationBuilder), 0),
 	}
 }
 
@@ -72,8 +84,12 @@ func (b *HostBuilder) ConfigureServices(configure func(services di.IServiceColle
 
 // ConfigureAppConfiguration adds a delegate for configuring the application configuration.
 func (b *HostBuilder) ConfigureAppConfiguration(configure func(config configuration.IConfigurationBuilder)) IHostBuilder {
-	// For now, configuration is already built
-	// In a full implementation, this would rebuild the configuration
+	// Support multiple calls, accumulate configuration actions
+	b.configurationActions = append(b.configurationActions, configure)
+
+	// Apply configuration action immediately to the Configuration
+	configure(b.Configuration)
+
 	return b
 }
 
@@ -89,18 +105,20 @@ func (b *HostBuilder) Build() IHost {
 	// Build service provider
 	provider := b.Services.BuildServiceProvider()
 
-	lifetime := NewApplicationLifetime()
-
-	host := &Host{
-		services:       provider,
-		environment:    b.Environment,
-		lifetime:       lifetime,
-		hostedServices: make([]IHostedService, 0),
+	// Get application lifetime
+	var lifetime IHostApplicationLifetime
+	if err := provider.GetService(&lifetime); err != nil {
+		lifetime = NewApplicationLifetime()
 	}
 
 	// Resolve hosted services
 	hostedServices := b.resolveHostedServices(provider)
-	host.hostedServices = hostedServices
+
+	// Get shutdown timeout from configuration (default 30 seconds)
+	shutdownTimeout := b.getShutdownTimeout()
+
+	// Create host
+	host := NewHostWithTimeout(provider, b.Environment, lifetime, hostedServices, shutdownTimeout)
 
 	return host
 }
@@ -116,4 +134,33 @@ func (b *HostBuilder) resolveHostedServices(provider di.IServiceProvider) []IHos
 	}
 
 	return services
+}
+
+// getShutdownTimeout gets the shutdown timeout from configuration or returns default.
+func (b *HostBuilder) getShutdownTimeout() time.Duration {
+	if b.Configuration == nil {
+		return 30 * time.Second
+	}
+
+	timeoutStr := b.Configuration.Get("server.shutdownTimeout")
+	if timeoutStr == "" {
+		return 30 * time.Second
+	}
+
+	// Parse timeout in seconds
+	if seconds, err := strconv.Atoi(timeoutStr); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+
+	return 30 * time.Second
+}
+
+// addDefaultLogging adds default logging services to the service collection.
+// This is called automatically by CreateDefaultBuilder().
+func addDefaultLogging(services di.IServiceCollection, config configuration.IConfiguration, env *Environment) {
+	// Use zerolog-based logging with configuration support
+	logging.AddLogging(services, config)
+
+	// In development, we could customize further if needed
+	// The configuration will be read from appsettings.json automatically
 }
