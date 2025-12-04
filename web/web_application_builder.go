@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -120,6 +121,20 @@ func (s *HttpServer) executeAsync(ctx context.Context) error {
 	errChan := make(chan error, 1)
 
 	go func() {
+		addr := s.addr
+		if strings.HasPrefix(addr, ":") {
+			addr = "http://localhost" + addr
+		} else if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+			addr = "http://" + addr
+		}
+
+		fmt.Println("========================================")
+		fmt.Println("🚀 Web Application Started")
+		fmt.Println("========================================")
+		fmt.Printf("📍 Listening on: %s\n", addr)
+		fmt.Println("========================================")
+		fmt.Println("")
+
 		if err := s.engine.Run(s.addr); err != nil {
 			errChan <- err
 		}
