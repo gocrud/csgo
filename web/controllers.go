@@ -1,6 +1,9 @@
 package web
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/gocrud/csgo/di"
 )
 
@@ -85,17 +88,44 @@ func (b *WebApplicationBuilder) AddControllers(configure ...func(*ControllerOpti
 //
 //	// With constructor function
 //	web.AddController(builder.Services, NewUserController)
-//
-//	// With inline factory
-//	web.AddController(builder.Services, func(sp di.IServiceProvider) *UserController {
-//	    userService := di.GetRequiredService[IUserService](sp)
-//	    return NewUserController(userService)
-//	})
-func AddController[T IController](services di.IServiceCollection, factory func(di.IServiceProvider) T) {
-	// Store factory for later instantiation during MapControllers()
-	// Controllers are created once at startup and reused for all requests
+func AddController(services di.IServiceCollection, constructor any) {
+	// 1. 基础校验：确保传入的是个函数
+	ctorType := reflect.TypeOf(constructor)
+	if ctorType.Kind() != reflect.Func {
+		panic("AddController: constructor must be a function")
+	}
+
+	// 2. 校验返回值：确保返回了 IController
+	// 支持 func(...) *UserController 或 func(...) (*UserController, error)
+	if ctorType.NumOut() == 0 {
+		panic("AddController: constructor must return a controller instance")
+	}
+
+	// 获取第一个返回值的类型（通常是 *UserController）
+	returnType := ctorType.Out(0)
+
+	// 验证它是否实现了 IController 接口
+	iControllerType := reflect.TypeOf((*IController)(nil)).Elem()
+	if !returnType.Implements(iControllerType) {
+		panic(fmt.Sprintf("AddController: Type %v must implement web.IController interface", returnType))
+	}
+
+	// 3. 将 Controller 注册到 DI 容器
+	// 利用 DI 引擎本身的能力来自动解析构造函数的参数
+	services.AddSingleton(constructor)
+
+	// 4. 注册到内部列表，供 MapControllers() 启动时使用
+	// 这里我们创建一个简单的适配器，从 DI 容器中取出已经注册好的实例
 	controllerFactories = append(controllerFactories, func(sp di.IServiceProvider) IController {
-		return factory(sp)
+		// 创建一个指向 Controller 类型的指针 (例如 **UserController)
+		// 因为 GetRequiredService 需要接收一个指针
+		target := reflect.New(returnType)
+
+		// 从 DI 容器中解析出刚才注册的 Singleton 实例
+		sp.GetRequiredService(target.Interface())
+
+		// 返回解析出的实例 (转换为 IController 接口)
+		return target.Elem().Interface().(IController)
 	})
 }
 

@@ -67,4 +67,3 @@ func (s *BackgroundService) ExecuteAsync(ctx context.Context) error {
 	}
 	return nil
 }
-

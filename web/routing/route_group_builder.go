@@ -33,10 +33,10 @@ type IEndpointRouteBuilder interface {
 
 // RouteGroupBuilder represents a group of endpoints with a common prefix.
 type RouteGroupBuilder struct {
-	ginGroup        *gin.RouterGroup
-	prefix          string
-	metadata        []interface{}
-	routes          []*RouteBuilder
+	ginGroup         *gin.RouterGroup
+	prefix           string
+	metadata         []interface{}
+	routes           []*RouteBuilder
 	handlerConvertFn func(Handler) gin.HandlerFunc
 }
 

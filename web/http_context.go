@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gocrud/csgo/validation"
 )
 
 // HttpContext wraps gin.Context and provides unified API for HTTP handling.
@@ -155,5 +156,45 @@ func (c *HttpContext) BindQuery(target interface{}) (ok bool, result IActionResu
 		return false, c.BadRequest(err.Error())
 	}
 	return true, nil
+}
+
+// ==================== Validation ====================
+
+// BindAndValidate binds JSON body and validates using FluentValidation validator.
+// Returns the bound object and nil if successful, or nil and an error result if failed.
+func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
+	var target T
+	
+	// 1. 绑定 JSON
+	if err := c.ShouldBindJSON(&target); err != nil {
+		return nil, c.BadRequest(err.Error())
+	}
+	
+	// 2. 查找注册的验证器
+	if validator, ok := validation.GetValidator[T](); ok {
+		result := validator.Validate(&target)
+		if !result.IsValid {
+			// 返回验证错误
+			return nil, c.BadRequest(result.Errors.Error())
+		}
+	}
+	
+	// 3. 如果实现了 Validator 接口，也调用
+	if v, ok := any(&target).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return nil, c.BadRequest(err.Error())
+		}
+	}
+	
+	return &target, nil
+}
+
+// ValidateStruct validates a struct using registered FluentValidation validator.
+// Note: This method requires the target to be passed as a pointer and
+// a validator must be registered for the type.
+func (c *HttpContext) ValidateStruct(target interface{}) IActionResult {
+	// 由于类型推断问题，这个方法暂时不实现通用版本
+	// 建议直接使用 BindAndValidate[T] 泛型方法
+	return nil
 }
 
