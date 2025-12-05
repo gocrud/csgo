@@ -1,7 +1,9 @@
 package openapi
 
 import (
+	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -131,8 +133,262 @@ func (g *Generator) addRoute(spec *Specification, route RouteInfo) {
 
 // processMetadata processes route metadata.
 func (g *Generator) processMetadata(spec *Specification, op *Operation, meta interface{}) {
-	// This will be implemented based on metadata types
-	// For now, skip
+	// Check if it's our ResponseMetadata or RequestMetadata
+	// We need to import the routing package, so we'll use type assertion with interface{}
+
+	// Try to access metadata fields using reflection
+	v := reflect.ValueOf(meta)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	typeName := v.Type().Name()
+
+	switch typeName {
+	case "ResponseMetadata":
+		g.addResponse(spec, op, meta)
+	case "RequestMetadata":
+		g.addRequestBody(spec, op, meta)
+	}
+}
+
+// addResponse adds a response to the operation.
+func (g *Generator) addResponse(spec *Specification, op *Operation, meta interface{}) {
+	v := reflect.ValueOf(meta)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	statusCode := int(v.FieldByName("StatusCode").Int())
+	isProblem := v.FieldByName("IsProblem").Bool()
+	typeField := v.FieldByName("Type")
+
+	statusCodeStr := strings.TrimSpace(strings.Split(strings.TrimPrefix(http.StatusText(statusCode), "HTTP "), " ")[0])
+	if statusCodeStr == "" {
+		statusCodeStr = "200"
+	}
+	// Convert status code to string
+	statusCodeStr = ""
+	if statusCode >= 100 && statusCode < 600 {
+		statusCodeStr = strconv.Itoa(statusCode)
+	} else {
+		statusCodeStr = "200"
+	}
+
+	if isProblem {
+		op.Responses[statusCodeStr] = Response{
+			Description: getDefaultResponseDescription(statusCode),
+			Content: map[string]MediaType{
+				"application/problem+json": {
+					Schema: g.getProblemDetailsSchema(),
+				},
+			},
+		}
+		return
+	}
+
+	if typeField.IsValid() && !typeField.IsZero() {
+		reflectType := typeField.Interface().(reflect.Type)
+		schema := g.generateSchemaFromReflectType(spec, reflectType)
+		op.Responses[statusCodeStr] = Response{
+			Description: getDefaultResponseDescription(statusCode),
+			Content: map[string]MediaType{
+				"application/json": {Schema: schema},
+			},
+		}
+	}
+}
+
+// addRequestBody adds a request body to the operation.
+func (g *Generator) addRequestBody(spec *Specification, op *Operation, meta interface{}) {
+	v := reflect.ValueOf(meta)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	contentType := v.FieldByName("ContentType").String()
+	typeField := v.FieldByName("Type")
+
+	if typeField.IsValid() && !typeField.IsZero() {
+		reflectType := typeField.Interface().(reflect.Type)
+		schema := g.generateSchemaFromReflectType(spec, reflectType)
+		op.RequestBody = &RequestBody{
+			Required: true,
+			Content: map[string]MediaType{
+				contentType: {Schema: schema},
+			},
+		}
+	}
+}
+
+// generateSchemaFromReflectType generates a schema from a reflect.Type.
+func (g *Generator) generateSchemaFromReflectType(spec *Specification, t reflect.Type) Schema {
+	if t == nil {
+		return Schema{Type: "object"}
+	}
+
+	switch t.Kind() {
+	case reflect.String:
+		return Schema{Type: "string"}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return Schema{Type: "integer"}
+	case reflect.Float32, reflect.Float64:
+		return Schema{Type: "number"}
+	case reflect.Bool:
+		return Schema{Type: "boolean"}
+	case reflect.Struct:
+		return g.generateStructSchema(spec, t)
+	case reflect.Slice, reflect.Array:
+		elemType := t.Elem()
+		itemSchema := g.generateSchemaFromReflectType(spec, elemType)
+		return Schema{
+			Type:  "array",
+			Items: &itemSchema,
+		}
+	case reflect.Ptr:
+		return g.generateSchemaFromReflectType(spec, t.Elem())
+	default:
+		return Schema{Type: "object"}
+	}
+}
+
+// generateStructSchema generates a schema for a struct type.
+func (g *Generator) generateStructSchema(spec *Specification, t reflect.Type) Schema {
+	schemaName := t.Name()
+	if schemaName == "" {
+		schemaName = "Anonymous"
+	}
+
+	// If already exists, return reference
+	if _, exists := spec.Components.Schemas[schemaName]; exists {
+		return Schema{Ref: "#/components/schemas/" + schemaName}
+	}
+
+	// Parse tags
+	fieldInfos := ParseStructTags(t)
+
+	properties := make(map[string]Schema)
+	required := []string{}
+
+	for fieldName, fieldInfo := range fieldInfos {
+		fieldSchema := g.generateFieldSchema(spec, t, fieldInfo)
+		properties[fieldName] = fieldSchema
+
+		if fieldInfo.Required {
+			required = append(required, fieldName)
+		}
+	}
+
+	schema := Schema{
+		Type:       "object",
+		Properties: properties,
+	}
+	if len(required) > 0 {
+		schema.Required = required
+	}
+
+	// Add to components
+	spec.Components.Schemas[schemaName] = schema
+
+	// Return reference
+	return Schema{Ref: "#/components/schemas/" + schemaName}
+}
+
+// generateFieldSchema generates a schema for a struct field.
+func (g *Generator) generateFieldSchema(spec *Specification, structType reflect.Type, fieldInfo FieldInfo) Schema {
+	// Find field type by name
+	var fieldType reflect.Type
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		jsonName := strings.Split(field.Tag.Get("json"), ",")[0]
+		if jsonName == fieldInfo.Name || field.Name == fieldInfo.Name {
+			fieldType = field.Type
+			break
+		}
+	}
+
+	if fieldType == nil {
+		return Schema{Type: "string"}
+	}
+
+	// Generate base schema from field type
+	schema := g.generateSchemaFromReflectType(spec, fieldType)
+
+	// Apply tag information
+	if fieldInfo.Description != "" {
+		schema.Description = fieldInfo.Description
+	}
+	if fieldInfo.Format != "" {
+		schema.Format = fieldInfo.Format
+	}
+	if fieldInfo.Example != nil {
+		schema.Example = fieldInfo.Example
+	}
+	if fieldInfo.Minimum != nil {
+		schema.Minimum = fieldInfo.Minimum
+	}
+	if fieldInfo.Maximum != nil {
+		schema.Maximum = fieldInfo.Maximum
+	}
+	if fieldInfo.MinLength != nil {
+		schema.MinLength = fieldInfo.MinLength
+	}
+	if fieldInfo.MaxLength != nil {
+		schema.MaxLength = fieldInfo.MaxLength
+	}
+	if fieldInfo.Pattern != "" {
+		schema.Pattern = fieldInfo.Pattern
+	}
+	if len(fieldInfo.Enum) > 0 {
+		schema.Enum = fieldInfo.Enum
+	}
+
+	return schema
+}
+
+// getProblemDetailsSchema returns the schema for RFC 7807 Problem Details.
+func (g *Generator) getProblemDetailsSchema() Schema {
+	return Schema{
+		Type: "object",
+		Properties: map[string]Schema{
+			"type":     {Type: "string"},
+			"title":    {Type: "string"},
+			"status":   {Type: "integer"},
+			"detail":   {Type: "string"},
+			"instance": {Type: "string"},
+		},
+	}
+}
+
+// getDefaultResponseDescription returns a default description for a status code.
+func getDefaultResponseDescription(statusCode int) string {
+	switch statusCode {
+	case 200:
+		return "Success"
+	case 201:
+		return "Created"
+	case 204:
+		return "No Content"
+	case 400:
+		return "Bad Request"
+	case 401:
+		return "Unauthorized"
+	case 403:
+		return "Forbidden"
+	case 404:
+		return "Not Found"
+	case 422:
+		return "Validation Error"
+	case 500:
+		return "Internal Server Error"
+	default:
+		return "Response"
+	}
 }
 
 // normalizePath converts Gin path format to OpenAPI format.

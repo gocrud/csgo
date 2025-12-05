@@ -1,34 +1,16 @@
 package routing
 
+import "reflect"
+
+// EndpointOption is a function that configures an endpoint.
+type EndpointOption func(IEndpointConventionBuilder) IEndpointConventionBuilder
+
 // IEndpointConventionBuilder is used to configure endpoints.
+// All configuration should be done through WithOpenApi() with endpoint options.
 type IEndpointConventionBuilder interface {
-	// WithName sets the endpoint name.
-	WithName(name string) IEndpointConventionBuilder
-
-	// WithDisplayName sets the display name for the endpoint.
-	WithDisplayName(displayName string) IEndpointConventionBuilder
-
-	// WithMetadata adds metadata to the endpoint.
-	WithMetadata(metadata ...interface{}) IEndpointConventionBuilder
-
-	// WithSummary sets the OpenAPI summary.
-	WithSummary(summary string) IEndpointConventionBuilder
-
-	// WithDescription sets the OpenAPI description.
-	WithDescription(description string) IEndpointConventionBuilder
-
-	// WithTags adds OpenAPI tags.
-	WithTags(tags ...string) IEndpointConventionBuilder
-
-	// WithOpenApi enables OpenAPI documentation for this endpoint.
+	// WithOpenApi enables OpenAPI documentation for this endpoint and applies options.
 	// Corresponds to .NET endpoint.WithOpenApi().
-	WithOpenApi() IEndpointConventionBuilder
-
-	// RequireAuthorization adds authorization requirements.
-	RequireAuthorization(policies ...string) IEndpointConventionBuilder
-
-	// AllowAnonymous allows anonymous access.
-	AllowAnonymous() IEndpointConventionBuilder
+	WithOpenApi(options ...EndpointOption) IEndpointConventionBuilder
 }
 
 // RouteBuilder implements IEndpointConventionBuilder.
@@ -57,99 +39,81 @@ func NewRouteBuilder(method, path string) *RouteBuilder {
 	}
 }
 
-// WithName sets the endpoint name.
-func (b *RouteBuilder) WithName(name string) IEndpointConventionBuilder {
-	b.name = name
-	return b
-}
-
-// WithDisplayName sets the display name.
-func (b *RouteBuilder) WithDisplayName(displayName string) IEndpointConventionBuilder {
-	b.displayName = displayName
-	return b
-}
-
-// WithMetadata adds metadata to the endpoint.
-func (b *RouteBuilder) WithMetadata(metadata ...interface{}) IEndpointConventionBuilder {
-	b.metadata = append(b.metadata, metadata...)
-	return b
-}
-
-// WithSummary sets the OpenAPI summary.
-func (b *RouteBuilder) WithSummary(summary string) IEndpointConventionBuilder {
-	b.summary = summary
-	return b
-}
-
-// WithDescription sets the OpenAPI description.
-func (b *RouteBuilder) WithDescription(description string) IEndpointConventionBuilder {
-	b.description = description
-	return b
-}
-
-// WithTags adds OpenAPI tags.
-func (b *RouteBuilder) WithTags(tags ...string) IEndpointConventionBuilder {
-	b.tags = append(b.tags, tags...)
-	return b
-}
-
-// WithOpenApi enables OpenAPI documentation for this endpoint.
+// WithOpenApi enables OpenAPI documentation for this endpoint and applies options.
 // Corresponds to .NET endpoint.WithOpenApi().
-func (b *RouteBuilder) WithOpenApi() IEndpointConventionBuilder {
+func (b *RouteBuilder) WithOpenApi(options ...EndpointOption) IEndpointConventionBuilder {
 	b.openApiEnabled = true
+
+	// Apply all options
+	for _, option := range options {
+		option(b)
+	}
+
 	return b
 }
 
-// RequireAuthorization adds authorization requirements.
-func (b *RouteBuilder) RequireAuthorization(policies ...string) IEndpointConventionBuilder {
-	b.authPolicies = append(b.authPolicies, policies...)
+// Setter methods for openapi package to configure endpoints
+
+// SetName sets the endpoint name.
+func (b *RouteBuilder) SetName(name string) {
+	b.name = name
+}
+
+// SetSummary sets the OpenAPI summary.
+func (b *RouteBuilder) SetSummary(summary string) {
+	b.summary = summary
+}
+
+// SetDescription sets the OpenAPI description.
+func (b *RouteBuilder) SetDescription(description string) {
+	b.description = description
+}
+
+// SetTags sets the OpenAPI tags.
+func (b *RouteBuilder) SetTags(tags []string) {
+	b.tags = tags
+}
+
+// AddTags adds OpenAPI tags.
+func (b *RouteBuilder) AddTags(tags ...string) {
+	b.tags = append(b.tags, tags...)
+}
+
+// AddResponseMetadata adds response metadata.
+func (b *RouteBuilder) AddResponseMetadata(metadata ResponseMetadata) {
+	b.metadata = append(b.metadata, &metadata)
+}
+
+// AddRequestMetadata adds request metadata.
+func (b *RouteBuilder) AddRequestMetadata(metadata RequestMetadata) {
+	b.metadata = append(b.metadata, &metadata)
+}
+
+// SetAuthorizationPolicies sets authorization policies.
+func (b *RouteBuilder) SetAuthorizationPolicies(policies []string) {
+	b.authPolicies = policies
 	b.allowAnonymous = false
-	return b
 }
 
-// AllowAnonymous allows anonymous access.
-func (b *RouteBuilder) AllowAnonymous() IEndpointConventionBuilder {
-	b.allowAnonymous = true
-	b.authPolicies = nil
-	return b
-}
-
-// Produces adds a response type to the endpoint.
-func Produces[T any](b IEndpointConventionBuilder, statusCode int) IEndpointConventionBuilder {
-	// Add response metadata
-	return b.WithMetadata(&ResponseMetadata{
-		StatusCode: statusCode,
-		Type:       new(T),
-	})
-}
-
-// ProducesProblem adds a problem details response.
-func ProducesProblem(b IEndpointConventionBuilder, statusCode int) IEndpointConventionBuilder {
-	return b.WithMetadata(&ResponseMetadata{
-		StatusCode: statusCode,
-		IsProblem:  true,
-	})
-}
-
-// Accepts adds a request body type to the endpoint.
-func Accepts[T any](b IEndpointConventionBuilder, contentType string) IEndpointConventionBuilder {
-	return b.WithMetadata(&RequestMetadata{
-		ContentType: contentType,
-		Type:        new(T),
-	})
+// SetAllowAnonymous sets whether anonymous access is allowed.
+func (b *RouteBuilder) SetAllowAnonymous(allow bool) {
+	b.allowAnonymous = allow
+	if allow {
+		b.authPolicies = nil
+	}
 }
 
 // ResponseMetadata represents response metadata.
 type ResponseMetadata struct {
 	StatusCode int
-	Type       interface{}
+	Type       reflect.Type
 	IsProblem  bool
 }
 
 // RequestMetadata represents request metadata.
 type RequestMetadata struct {
 	ContentType string
-	Type        interface{}
+	Type        reflect.Type
 }
 
 // GetMethod returns the HTTP method.

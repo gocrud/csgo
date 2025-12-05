@@ -199,9 +199,13 @@ swagger.AddSwaggerGen(builder.Services, func(opts *swagger.SwaggerGenOptions) {
 app := builder.Build()
 
 // 定义 API 路由
-app.MapGet("/api/users", func(c *gin.Context) {
-    c.JSON(200, []string{"Alice", "Bob"})
-}).WithSummary("List users")
+app.MapGet("/api/users", func(c *web.HttpContext) web.IActionResult {
+    return c.Ok([]string{"Alice", "Bob"})
+}).WithOpenApi(
+    openapi.Name("ListUsers"),
+    openapi.Summary("List users"),
+    openapi.Produces[[]string](200),
+)
 ```
 
 ---
@@ -296,9 +300,12 @@ app := builder.Build()
 swagger.UseSwagger(app)      // 启用 /swagger/v1/swagger.json
 swagger.UseSwaggerUI(app)    // 启用 /swagger UI
 
-app.MapGet("/api/users", func(c *gin.Context) {
-    c.JSON(200, []string{"Alice", "Bob"})
-}).WithSummary("List users")
+app.MapGet("/api/users", func(c *web.HttpContext) web.IActionResult {
+    return c.Ok([]string{"Alice", "Bob"})
+}).WithOpenApi(
+    openapi.Summary("List users"),
+    openapi.Produces[[]string](200),
+)
 
 app.Run()
 ```

@@ -682,8 +682,10 @@ func NewAuthController(authService *services.AuthService) *AuthController {
 }
 
 func (ctrl *AuthController) MapRoutes(app *web.WebApplication) {
-    auth := app.MapGroup("/api/auth")
-    auth.WithTags("Auth")
+    auth := app.MapGroup("/api/auth").
+        WithOpenApi(
+            openapi.Tags("Auth"),
+        )
     
     auth.MapPost("/register", ctrl.Register).
         WithSummary("用户注册")
@@ -751,17 +753,44 @@ func NewPostController(postService *services.PostService) *PostController {
 }
 
 func (ctrl *PostController) MapRoutes(app *web.WebApplication) {
-    posts := app.MapGroup("/api/posts")
-    posts.WithTags("Posts")
+    posts := app.MapGroup("/api/posts").
+        WithOpenApi(
+            openapi.Tags("Posts"),
+        )
     
     // 公开接口
-    posts.MapGet("", ctrl.List).WithSummary("获取文章列表")
-    posts.MapGet("/:id", ctrl.GetByID).WithSummary("获取文章详情")
+    posts.MapGet("", ctrl.List).
+        WithOpenApi(
+            openapi.Summary("获取文章列表"),
+            openapi.Produces[[]Post](200),
+        )
+    posts.MapGet("/:id", ctrl.GetByID).
+        WithOpenApi(
+            openapi.Summary("获取文章详情"),
+            openapi.Produces[Post](200),
+            openapi.ProducesProblem(404),
+        )
     
     // 需要认证的接口（通过中间件控制）
-    posts.MapPost("", ctrl.Create).WithSummary("创建文章")
-    posts.MapPut("/:id", ctrl.Update).WithSummary("更新文章")
-    posts.MapDelete("/:id", ctrl.Delete).WithSummary("删除文章")
+    posts.MapPost("", ctrl.Create).
+        WithOpenApi(
+            openapi.Summary("创建文章"),
+            openapi.Accepts[CreatePostRequest]("application/json"),
+            openapi.Produces[Post](201),
+        )
+    posts.MapPut("/:id", ctrl.Update).
+        WithOpenApi(
+            openapi.Summary("更新文章"),
+            openapi.Accepts[UpdatePostRequest]("application/json"),
+            openapi.Produces[Post](200),
+            openapi.ProducesProblem(404),
+        )
+    posts.MapDelete("/:id", ctrl.Delete).
+        WithOpenApi(
+            openapi.Summary("删除文章"),
+            openapi.Produces[any](204),
+            openapi.ProducesProblem(404),
+        )
 }
 
 func (ctrl *PostController) List(c *web.HttpContext) web.IActionResult {

@@ -158,20 +158,15 @@ func (g *RouteGroupBuilder) mapRoute(method, pattern string, handlers ...Handler
 }
 
 // WithOpenApi enables OpenAPI documentation for this group.
-func (g *RouteGroupBuilder) WithOpenApi() *RouteGroupBuilder {
+// Options are stored and will be applied to routes created in this group.
+func (g *RouteGroupBuilder) WithOpenApi(options ...EndpointOption) *RouteGroupBuilder {
 	g.metadata = append(g.metadata, &OpenApiMetadata{Enabled: true})
-	return g
-}
 
-// RequireAuthorization adds authorization requirement to all routes in this group.
-func (g *RouteGroupBuilder) RequireAuthorization(policies ...string) *RouteGroupBuilder {
-	g.metadata = append(g.metadata, &AuthorizationMetadata{Policies: policies})
-	return g
-}
+	// Store options in metadata to be applied to child routes
+	if len(options) > 0 {
+		g.metadata = append(g.metadata, &GroupEndpointOptions{Options: options})
+	}
 
-// WithTags adds OpenAPI tags to all routes in this group.
-func (g *RouteGroupBuilder) WithTags(tags ...string) *RouteGroupBuilder {
-	g.metadata = append(g.metadata, &TagsMetadata{Tags: tags})
 	return g
 }
 
@@ -183,6 +178,11 @@ func (g *RouteGroupBuilder) GetRoutes() []*RouteBuilder {
 // OpenApiMetadata represents OpenAPI metadata.
 type OpenApiMetadata struct {
 	Enabled bool
+}
+
+// GroupEndpointOptions holds endpoint options to be applied to group routes.
+type GroupEndpointOptions struct {
+	Options []EndpointOption
 }
 
 // AuthorizationMetadata represents authorization metadata.

@@ -82,14 +82,47 @@ func NewUserController(userService UserService) *UserController {
 
 // MapRoutes 实现 web.IController 接口
 func (ctrl *UserController) MapRoutes(app *web.WebApplication) {
-    users := app.MapGroup("/api/users")
-    users.WithTags("Users")
+    // 组级别配置
+    users := app.MapGroup("/api/users").
+        WithOpenApi(
+            openapi.Tags("Users"),
+        )
     
-    users.MapGet("", ctrl.GetAll)
-    users.MapGet("/:id", ctrl.GetByID)
-    users.MapPost("", ctrl.Create)
-    users.MapPut("/:id", ctrl.Update)
-    users.MapDelete("/:id", ctrl.Delete)
+    users.MapGet("", ctrl.GetAll).
+        WithOpenApi(
+            openapi.Name("GetAllUsers"),
+            openapi.Summary("获取所有用户"),
+            openapi.Produces[[]User](200),
+        )
+    users.MapGet("/:id", ctrl.GetByID).
+        WithOpenApi(
+            openapi.Name("GetUserByID"),
+            openapi.Summary("根据 ID 获取用户"),
+            openapi.Produces[User](200),
+            openapi.ProducesProblem(404),
+        )
+    users.MapPost("", ctrl.Create).
+        WithOpenApi(
+            openapi.Name("CreateUser"),
+            openapi.Summary("创建用户"),
+            openapi.Accepts[CreateUserRequest]("application/json"),
+            openapi.Produces[User](201),
+        )
+    users.MapPut("/:id", ctrl.Update).
+        WithOpenApi(
+            openapi.Name("UpdateUser"),
+            openapi.Summary("更新用户"),
+            openapi.Accepts[UpdateUserRequest]("application/json"),
+            openapi.Produces[User](200),
+            openapi.ProducesProblem(404),
+        )
+    users.MapDelete("/:id", ctrl.Delete).
+        WithOpenApi(
+            openapi.Name("DeleteUser"),
+            openapi.Summary("删除用户"),
+            openapi.Produces[any](204),
+            openapi.ProducesProblem(404),
+        )
 }
 
 // GetAll 处理 GET /api/users - 使用 ActionResult
@@ -374,14 +407,39 @@ func NewUserController(userService services.UserService) *UserController {
 }
 
 func (ctrl *UserController) MapRoutes(app *web.WebApplication) {
-    users := app.MapGroup("/api/users")
-    users.WithTags("Users")
+    users := app.MapGroup("/api/users").
+        WithOpenApi(
+            openapi.Tags("Users"),
+        )
     
-    users.MapGet("", ctrl.GetAll).WithSummary("获取所有用户")
-    users.MapGet("/:id", ctrl.GetByID).WithSummary("根据 ID 获取用户")
-    users.MapPost("", ctrl.Create).WithSummary("创建用户")
-    users.MapPut("/:id", ctrl.Update).WithSummary("更新用户")
-    users.MapDelete("/:id", ctrl.Delete).WithSummary("删除用户")
+    users.MapGet("", ctrl.GetAll).
+        WithOpenApi(
+            openapi.Summary("获取所有用户"),
+            openapi.Produces[[]User](200),
+        )
+    users.MapGet("/:id", ctrl.GetByID).
+        WithOpenApi(
+            openapi.Summary("根据 ID 获取用户"),
+            openapi.Produces[User](200),
+            openapi.ProducesProblem(404),
+        )
+    users.MapPost("", ctrl.Create).
+        WithOpenApi(
+            openapi.Summary("创建用户"),
+            openapi.Accepts[CreateUserRequest]("application/json"),
+            openapi.Produces[User](201),
+        )
+    users.MapPut("/:id", ctrl.Update).
+        WithOpenApi(
+            openapi.Summary("更新用户"),
+            openapi.Accepts[UpdateUserRequest]("application/json"),
+            openapi.Produces[User](200),
+        )
+    users.MapDelete("/:id", ctrl.Delete).
+        WithOpenApi(
+            openapi.Summary("删除用户"),
+            openapi.Produces[any](204),
+        )
 }
 
 func (ctrl *UserController) GetAll(c *web.HttpContext) web.IActionResult {

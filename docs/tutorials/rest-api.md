@@ -295,8 +295,10 @@ func NewTodoController(todoService *services.TodoService) *TodoController {
 
 // MapRoutes 实现 IController 接口
 func (ctrl *TodoController) MapRoutes(app *web.WebApplication) {
-    todos := app.MapGroup("/api/todos")
-    todos.WithTags("Todos")
+    todos := app.MapGroup("/api/todos").
+        WithOpenApi(
+            openapi.Tags("Todos"),
+        )
     
     todos.MapGet("", ctrl.List).
         WithSummary("获取待办列表").

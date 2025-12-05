@@ -333,30 +333,53 @@ v2 := api.MapGroup("/v2")
 v2.MapGet("/products", GetProductsV2)
 ```
 
-### 路由元数据（Swagger）
+### 路由元数据（OpenAPI）
 
 ```go
 app.MapGet("/users", GetUsers).
-    WithSummary("获取所有用户").
-    WithDescription("返回系统中所有用户的列表").
-    WithTags("Users")
+    WithOpenApi(
+        openapi.Name("GetUsers"),
+        openapi.Summary("获取所有用户"),
+        openapi.Description("返回系统中所有用户的列表"),
+        openapi.Tags("Users"),
+        openapi.Produces[[]User](200),
+    )
 
 app.MapPost("/users", CreateUser).
-    WithSummary("创建用户").
-    WithDescription("创建一个新用户并返回创建结果")
+    WithOpenApi(
+        openapi.Name("CreateUser"),
+        openapi.Summary("创建用户"),
+        openapi.Description("创建一个新用户并返回创建结果"),
+        openapi.Tags("Users"),
+        openapi.Accepts[CreateUserRequest]("application/json"),
+        openapi.Produces[User](201),
+    )
 ```
 
 ### 路由组元数据
 
 ```go
-users := app.MapGroup("/api/users")
-users.WithTags("Users")  // 组内所有路由共享 tag
+// 组级别配置
+users := app.MapGroup("/api/users").
+    WithOpenApi(
+        openapi.Tags("Users"),
+    )
 
+// 组内路由自动继承标签
 users.MapGet("", GetAllUsers).
-    WithSummary("获取所有用户")
+    WithOpenApi(
+        openapi.Name("GetAllUsers"),
+        openapi.Summary("获取所有用户"),
+        openapi.Produces[[]User](200),
+    )
 
 users.MapGet("/:id", GetUserByID).
-    WithSummary("根据 ID 获取用户")
+    WithOpenApi(
+        openapi.Name("GetUserByID"),
+        openapi.Summary("根据 ID 获取用户"),
+        openapi.Produces[User](200),
+        openapi.ProducesProblem(404),
+    )
 ```
 
 ## HttpContext

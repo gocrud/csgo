@@ -399,12 +399,17 @@ func main() {
     builder := web.CreateBuilder()
     app := builder.Build()
     
-    users := app.MapGroup("/api/users")
-    users.WithTags("Users")
+    users := app.MapGroup("/api/users").
+        WithOpenApi(
+            openapi.Tags("Users"),
+        )
     
     users.MapGet("", func(c *web.HttpContext) web.IActionResult {
         return c.Ok([]User{{ID: 1, Name: "Alice"}})
-    }).WithSummary("获取所有用户")
+    }).WithOpenApi(
+        openapi.Summary("获取所有用户"),
+        openapi.Produces[[]User](200),
+    )
     
     users.MapGet("/:id", func(c *web.HttpContext) web.IActionResult {
         id, err := c.MustPathInt("id")
@@ -412,7 +417,11 @@ func main() {
             return err
         }
         return c.Ok(User{ID: id, Name: "User"})
-    }).WithSummary("获取用户")
+    }).WithOpenApi(
+        openapi.Summary("获取用户"),
+        openapi.Produces[User](200),
+        openapi.ProducesProblem(404),
+    )
     
     users.MapPost("", func(c *web.HttpContext) web.IActionResult {
         var req CreateUserRequest
@@ -420,11 +429,18 @@ func main() {
             return err
         }
         return c.Created(User{ID: 1, Name: req.Name})
-    }).WithSummary("创建用户")
+    }).WithOpenApi(
+        openapi.Summary("创建用户"),
+        openapi.Accepts[CreateUserRequest]("application/json"),
+        openapi.Produces[User](201),
+    )
     
     users.MapDelete("/:id", func(c *web.HttpContext) web.IActionResult {
         return c.NoContent()
-    }).WithSummary("删除用户")
+    }).WithOpenApi(
+        openapi.Summary("删除用户"),
+        openapi.Produces[any](204),
+    )
     
     app.Run()
 }
