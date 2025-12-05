@@ -152,6 +152,7 @@ func (e *Engine) Compile() error {
 
 	// 提前实例化所有 Singleton
 	singletons := make([]interface{}, len(e.registrations))
+	e.singletons.Store(singletons)
 	for _, key := range sorted {
 		reg := e.registrations[key]
 		if reg != nil && reg.Lifetime == Singleton {
@@ -164,7 +165,6 @@ func (e *Engine) Compile() error {
 		}
 	}
 
-	e.singletons.Store(singletons)
 	e.compiled.Store(true)
 	return nil
 }
