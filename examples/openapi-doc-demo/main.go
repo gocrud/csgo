@@ -57,71 +57,71 @@ func setupRoutes(app *web.WebApplication) {
 	// GET /users/:id - Get user by ID
 	app.MapGet("/users/:id", getUserHandler).
 		WithOpenApi(
-			openapi.Name("GetUser"),
-			openapi.Summary("获取用户详情"),
-			openapi.Description("根据用户ID获取用户的详细信息"),
-			openapi.Tags("Users"),
-			openapi.Produces[User](200),
-			openapi.ProducesProblem(404),
+			openapi.OptName("GetUser"),
+			openapi.OptSummary("获取用户详情"),
+			openapi.OptDescription("根据用户ID获取用户的详细信息"),
+			openapi.OptTags("Users"),
+			openapi.OptResponse[User](200),
+			openapi.OptResponseProblem(404),
 		)
 	// GET /users - List all users
 	app.MapGet("/users", listUsersHandler).
 		WithOpenApi(
-			openapi.Name("ListUsers"),
-			openapi.Summary("获取用户列表"),
-			openapi.Description("获取所有用户的列表"),
-			openapi.Tags("Users"),
-			openapi.Produces[[]User](200),
+			openapi.OptName("ListUsers"),
+			openapi.OptSummary("获取用户列表"),
+			openapi.OptDescription("获取所有用户的列表"),
+			openapi.OptTags("Users"),
+			openapi.OptResponse[[]User](200),
 		)
 
 	// POST /users - Create new user
 	app.MapPost("/users", createUserHandler).
 		WithOpenApi(
-			openapi.Name("CreateUser"),
-			openapi.Summary("创建新用户"),
-			openapi.Description("创建一个新的用户账户"),
-			openapi.Tags("Users"),
-			openapi.Accepts[CreateUserRequest]("application/json"),
-			openapi.Produces[User](201),
-			openapi.ProducesValidationProblem(),
-			openapi.ProducesProblem(400),
+			openapi.OptName("CreateUser"),
+			openapi.OptSummary("创建新用户"),
+			openapi.OptDescription("创建一个新的用户账户"),
+			openapi.OptTags("Users"),
+			openapi.OptRequest[CreateUserRequest]("application/json"),
+			openapi.OptResponse[User](201),
+			openapi.OptResponseValidationProblem(),
+			openapi.OptResponseProblem(400),
 		)
 
 	// PUT /users/:id - Update user
 	app.MapPut("/users/:id", updateUserHandler).
 		WithOpenApi(
-			openapi.Name("UpdateUser"),
-			openapi.Summary("更新用户信息"),
-			openapi.Description("更新指定用户的信息"),
-			openapi.Tags("Users"),
-			openapi.Accepts[UpdateUserRequest]("application/json"),
-			openapi.Produces[User](200),
-			openapi.ProducesProblem(404),
-			openapi.ProducesValidationProblem(),
+			openapi.OptName("UpdateUser"),
+			openapi.OptSummary("更新用户信息"),
+			openapi.OptDescription("更新指定用户的信息"),
+			openapi.OptTags("Users"),
+			openapi.OptRequest[UpdateUserRequest]("application/json"),
+			openapi.OptResponse[User](200),
+			openapi.OptResponseProblem(404),
+			openapi.OptResponseValidationProblem(),
 		)
 
 	// DELETE /users/:id - Delete user
 	app.MapDelete("/users/:id", deleteUserHandler).
 		WithOpenApi(
-			openapi.Name("DeleteUser"),
-			openapi.Summary("删除用户"),
-			openapi.Description("删除指定的用户"),
-			openapi.Tags("Users"),
-			openapi.Produces[any](204),
-			openapi.ProducesProblem(404),
+			openapi.OptName("DeleteUser"),
+			openapi.OptSummary("删除用户"),
+			openapi.OptDescription("删除指定的用户"),
+			openapi.OptTags("Users"),
+			openapi.OptResponse[any](204),
+			openapi.OptResponseProblem(404),
 		)
 
 	// Example: Group-level OpenAPI configuration
 	apiV2 := app.MapGroup("/api/v2").
 		WithOpenApi(
-			openapi.Tags("API v2"),
+			openapi.OptTags("API v2"),
 		)
 
 	apiV2.MapGet("/users", listUsersV2Handler).
 		WithOpenApi(
-			openapi.Name("V2.ListUsers"),
-			openapi.Summary("获取用户列表 (v2)"),
-			openapi.Produces[[]User](200),
+			openapi.OptName("V2.ListUsers"),
+			openapi.OptSummary("获取用户列表 (v2)"),
+			openapi.OptResponse[[]User](200),
 		)
 }
 

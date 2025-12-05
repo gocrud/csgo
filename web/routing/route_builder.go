@@ -116,6 +116,20 @@ type RequestMetadata struct {
 	Type        reflect.Type
 }
 
+// ParameterMetadata represents parameter metadata.
+type ParameterMetadata struct {
+	Name        string
+	In          string // path, query, header, cookie
+	Description string
+	Required    bool
+	Type        reflect.Type
+}
+
+// AddParameterMetadata adds parameter metadata.
+func (b *RouteBuilder) AddParameterMetadata(metadata ParameterMetadata) {
+	b.metadata = append(b.metadata, &metadata)
+}
+
 // GetMethod returns the HTTP method.
 func (b *RouteBuilder) GetMethod() string {
 	return b.method

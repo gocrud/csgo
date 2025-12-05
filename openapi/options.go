@@ -6,8 +6,8 @@ import (
 	"github.com/gocrud/csgo/web/routing"
 )
 
-// Name returns an option that sets the endpoint name.
-func Name(name string) routing.EndpointOption {
+// OptName returns an option that sets the endpoint name.
+func OptName(name string) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.SetName(name)
@@ -16,8 +16,8 @@ func Name(name string) routing.EndpointOption {
 	}
 }
 
-// Summary returns an option that sets the OpenAPI summary.
-func Summary(summary string) routing.EndpointOption {
+// OptSummary returns an option that sets the OpenAPI summary.
+func OptSummary(summary string) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.SetSummary(summary)
@@ -26,8 +26,8 @@ func Summary(summary string) routing.EndpointOption {
 	}
 }
 
-// Description returns an option that sets the OpenAPI description.
-func Description(description string) routing.EndpointOption {
+// OptDescription returns an option that sets the OpenAPI description.
+func OptDescription(description string) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.SetDescription(description)
@@ -36,8 +36,8 @@ func Description(description string) routing.EndpointOption {
 	}
 }
 
-// Tags returns an option that adds OpenAPI tags.
-func Tags(tags ...string) routing.EndpointOption {
+// OptTags returns an option that adds OpenAPI tags.
+func OptTags(tags ...string) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.AddTags(tags...)
@@ -46,8 +46,8 @@ func Tags(tags ...string) routing.EndpointOption {
 	}
 }
 
-// Produces returns an option that adds a response type (generic).
-func Produces[T any](statusCode int) routing.EndpointOption {
+// OptResponse returns an option that adds a response type (generic).
+func OptResponse[T any](statusCode int) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.AddResponseMetadata(routing.ResponseMetadata{
@@ -59,8 +59,8 @@ func Produces[T any](statusCode int) routing.EndpointOption {
 	}
 }
 
-// ProducesProblem returns an option that adds a problem details response.
-func ProducesProblem(statusCode int) routing.EndpointOption {
+// OptResponseProblem returns an option that adds a problem details response.
+func OptResponseProblem(statusCode int) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.AddResponseMetadata(routing.ResponseMetadata{
@@ -72,17 +72,21 @@ func ProducesProblem(statusCode int) routing.EndpointOption {
 	}
 }
 
-// ProducesValidationProblem returns an option that adds a validation problem response (422).
-func ProducesValidationProblem() routing.EndpointOption {
-	return ProducesProblem(422)
+// OptResponseValidationProblem returns an option that adds a validation problem response (422).
+func OptResponseValidationProblem() routing.EndpointOption {
+	return OptResponseProblem(422)
 }
 
-// Accepts returns an option that adds a request body type (generic).
-func Accepts[T any](contentType string) routing.EndpointOption {
+// OptRequest returns an option that adds a request body type (generic).
+func OptRequest[T any](contentType ...string) routing.EndpointOption {
+	ct := "application/json"
+	if len(contentType) > 0 && contentType[0] != "" {
+		ct = contentType[0]
+	}
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.AddRequestMetadata(routing.RequestMetadata{
-				ContentType: contentType,
+				ContentType: ct,
 				Type:        reflect.TypeOf((*T)(nil)).Elem(),
 			})
 		}
@@ -90,8 +94,8 @@ func Accepts[T any](contentType string) routing.EndpointOption {
 	}
 }
 
-// Authorization returns an option that adds authorization requirements.
-func Authorization(policies ...string) routing.EndpointOption {
+// OptAuthorization returns an option that adds authorization requirements.
+func OptAuthorization(policies ...string) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.SetAuthorizationPolicies(policies)
@@ -100,12 +104,53 @@ func Authorization(policies ...string) routing.EndpointOption {
 	}
 }
 
-// Anonymous returns an option that allows anonymous access.
-func Anonymous() routing.EndpointOption {
+// OptAnonymous returns an option that allows anonymous access.
+func OptAnonymous() routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.SetAllowAnonymous(true)
 		}
 		return b
 	}
+}
+
+// OptParam is a generic option for adding parameters.
+func OptParam[T any](name, in, description string, required bool) routing.EndpointOption {
+	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
+		if rb, ok := b.(*routing.RouteBuilder); ok {
+			rb.AddParameterMetadata(routing.ParameterMetadata{
+				Name:        name,
+				In:          in,
+				Description: description,
+				Required:    required,
+				Type:        reflect.TypeOf((*T)(nil)).Elem(),
+			})
+		}
+		return b
+	}
+}
+
+// OptQuery defines a query parameter.
+func OptQuery[T any](name, description string) routing.EndpointOption {
+	return OptParam[T](name, "query", description, false)
+}
+
+// OptQueryRequired defines a required query parameter.
+func OptQueryRequired[T any](name, description string) routing.EndpointOption {
+	return OptParam[T](name, "query", description, true)
+}
+
+// OptPath defines a path parameter.
+func OptPath[T any](name, description string) routing.EndpointOption {
+	return OptParam[T](name, "path", description, true)
+}
+
+// OptHeader defines a header parameter.
+func OptHeader[T any](name, description string) routing.EndpointOption {
+	return OptParam[T](name, "header", description, false)
+}
+
+// OptCookie defines a cookie parameter.
+func OptCookie[T any](name, description string) routing.EndpointOption {
+	return OptParam[T](name, "cookie", description, false)
 }

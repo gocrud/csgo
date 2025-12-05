@@ -147,7 +147,11 @@ func (g *RouteGroupBuilder) mapRoute(method, pattern string, handlers ...Handler
 	for _, meta := range g.metadata {
 		if openApiMeta, ok := meta.(*OpenApiMetadata); ok && openApiMeta.Enabled {
 			rb.openApiEnabled = true
-			break
+		}
+		if groupOpts, ok := meta.(*GroupEndpointOptions); ok {
+			for _, opt := range groupOpts.Options {
+				opt(rb)
+			}
 		}
 	}
 

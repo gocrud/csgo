@@ -153,7 +153,39 @@ func (g *Generator) processMetadata(spec *Specification, op *Operation, meta int
 		g.addResponse(spec, op, meta)
 	case "RequestMetadata":
 		g.addRequestBody(spec, op, meta)
+	case "ParameterMetadata":
+		g.addParameter(spec, op, meta)
 	}
+}
+
+// addParameter adds a parameter to the operation.
+func (g *Generator) addParameter(spec *Specification, op *Operation, meta interface{}) {
+	v := reflect.ValueOf(meta)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	name := v.FieldByName("Name").String()
+	in := v.FieldByName("In").String()
+	description := v.FieldByName("Description").String()
+	required := v.FieldByName("Required").Bool()
+	typeField := v.FieldByName("Type")
+
+	schema := Schema{Type: "string"}
+	if typeField.IsValid() && !typeField.IsZero() {
+		reflectType := typeField.Interface().(reflect.Type)
+		schema = g.generateSchemaFromReflectType(spec, reflectType)
+	}
+
+	param := Parameter{
+		Name:        name,
+		In:          in,
+		Description: description,
+		Required:    required,
+		Schema:      schema,
+	}
+
+	op.Parameters = append(op.Parameters, param)
 }
 
 // addResponse adds a response to the operation.
