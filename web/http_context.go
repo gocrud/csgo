@@ -1,7 +1,9 @@
 package web
 
 import (
+	"io"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocrud/csgo/errors"
@@ -157,6 +159,25 @@ func (c *HttpContext) QueryBool(key string, defaultValue bool) bool {
 // Returns true if binding succeeded, false otherwise.
 func (c *HttpContext) BindJSON(target interface{}) (ok bool, result IActionResult) {
 	if err := c.ShouldBindJSON(target); err != nil {
+		// 检查是否为 EOF 错误(空请求体)
+		if err == io.EOF || err.Error() == "EOF" {
+			return false, c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
+		}
+
+		// 检查是否为不完整的 JSON
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "unexpected end of JSON input") ||
+			strings.Contains(errMsg, "unexpected EOF") {
+			return false, c.BadRequest("请求体格式不完整,请提供完整的 JSON 数据")
+		}
+
+		// 其他 JSON 解析错误,提供更友好的错误提示
+		if strings.Contains(errMsg, "invalid character") ||
+			strings.Contains(errMsg, "cannot unmarshal") {
+			return false, c.BadRequest("JSON 格式错误: " + errMsg)
+		}
+
+		// 未知错误,直接返回原始错误信息
 		return false, c.BadRequest(err.Error())
 	}
 	return true, nil
@@ -166,6 +187,25 @@ func (c *HttpContext) BindJSON(target interface{}) (ok bool, result IActionResul
 // This is a convenience method that returns only the error result.
 func (c *HttpContext) MustBindJSON(target interface{}) IActionResult {
 	if err := c.ShouldBindJSON(target); err != nil {
+		// 检查是否为 EOF 错误(空请求体)
+		if err == io.EOF || err.Error() == "EOF" {
+			return c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
+		}
+
+		// 检查是否为不完整的 JSON
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "unexpected end of JSON input") ||
+			strings.Contains(errMsg, "unexpected EOF") {
+			return c.BadRequest("请求体格式不完整,请提供完整的 JSON 数据")
+		}
+
+		// 其他 JSON 解析错误,提供更友好的错误提示
+		if strings.Contains(errMsg, "invalid character") ||
+			strings.Contains(errMsg, "cannot unmarshal") {
+			return c.BadRequest("JSON 格式错误: " + errMsg)
+		}
+
+		// 未知错误,直接返回原始错误信息
 		return c.BadRequest(err.Error())
 	}
 	return nil
@@ -183,12 +223,31 @@ func (c *HttpContext) BindQuery(target interface{}) (ok bool, result IActionResu
 
 // BindAndValidate binds JSON body and validates using FluentValidation validator.
 // Returns the bound object and nil if successful, or nil and an error result if failed.
-// 自动使用注册验证器的模式（快速失败或全量验证）
+// 自动使用注册验证器的模式(快速失败或全量验证)
 func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
 	var target T
 
-	// 1. 绑定 JSON
+	// 1. 绑定 JSON,增强错误处理
 	if err := c.ShouldBindJSON(&target); err != nil {
+		// 检查是否为 EOF 错误(空请求体)
+		if err == io.EOF || err.Error() == "EOF" {
+			return nil, c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
+		}
+
+		// 检查是否为不完整的 JSON
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "unexpected end of JSON input") ||
+			strings.Contains(errMsg, "unexpected EOF") {
+			return nil, c.BadRequest("请求体格式不完整,请提供完整的 JSON 数据")
+		}
+
+		// 其他 JSON 解析错误,提供更友好的错误提示
+		if strings.Contains(errMsg, "invalid character") ||
+			strings.Contains(errMsg, "cannot unmarshal") {
+			return nil, c.BadRequest("JSON 格式错误: " + errMsg)
+		}
+
+		// 未知错误,直接返回原始错误信息
 		return nil, c.BadRequest(err.Error())
 	}
 
