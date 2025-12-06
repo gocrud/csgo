@@ -1,13 +1,16 @@
 package validation
 
+import "github.com/gocrud/csgo/errors"
+
 // CustomRule 自定义验证规则
 func CustomRule[T any](v *AbstractValidator[T], predicate func(*T) error) {
-	v.rules = append(v.rules, func(instance *T) ValidationErrors {
+	v.rules = append(v.rules, func(instance *T, mode ValidateMode) ValidationErrors {
 		if err := predicate(instance); err != nil {
 			return ValidationErrors{
 				{
 					Field:   "_custom",
 					Message: err.Error(),
+					Code:    errors.ValidationFailed,
 				},
 			}
 		}

@@ -12,25 +12,50 @@ type ValidationContext struct {
 	RootObject interface{}
 }
 
+// ValidateMode 验证模式
+type ValidateMode int
+
+const (
+	// ValidateFailFast 快速失败模式（默认），遇到第一个错误立即返回
+	ValidateFailFast ValidateMode = iota
+	// ValidateAll 验证所有字段，收集所有错误
+	ValidateAll
+)
+
 // AbstractValidator 抽象验证器基类
 type AbstractValidator[T any] struct {
-	rules []func(*T) ValidationErrors
+	rules []func(*T, ValidateMode) ValidationErrors
+	mode  ValidateMode // 验证模式
 }
 
-// NewValidator 创建新的验证器
+// NewValidator 创建快速失败模式验证器（默认，推荐）
 func NewValidator[T any]() *AbstractValidator[T] {
 	return &AbstractValidator[T]{
-		rules: make([]func(*T) ValidationErrors, 0),
+		rules: make([]func(*T, ValidateMode) ValidationErrors, 0),
+		mode:  ValidateFailFast,
 	}
 }
 
-// Validate 执行验证
+// NewValidatorAll 创建全量验证模式验证器（收集所有错误）
+func NewValidatorAll[T any]() *AbstractValidator[T] {
+	return &AbstractValidator[T]{
+		rules: make([]func(*T, ValidateMode) ValidationErrors, 0),
+		mode:  ValidateAll,
+	}
+}
+
+// Validate 执行验证（使用创建时指定的模式）
 func (v *AbstractValidator[T]) Validate(instance *T) ValidationResult {
 	errors := ValidationErrors{}
 
 	for _, rule := range v.rules {
-		ruleErrors := rule(instance)
+		ruleErrors := rule(instance, v.mode)
 		errors = append(errors, ruleErrors...)
+
+		// 快速失败模式：遇到第一个错误立即返回
+		if v.mode == ValidateFailFast && len(errors) > 0 {
+			break
+		}
 	}
 
 	return NewValidationResult(errors)
@@ -52,7 +77,7 @@ func (v *AbstractValidator[T]) Field(selector func(*T) string) *StringRuleBuilde
 	}
 
 	// 将规则收集函数添加到验证器
-	v.rules = append(v.rules, func(instance *T) ValidationErrors {
+	v.rules = append(v.rules, func(instance *T, mode ValidateMode) ValidationErrors {
 		errors := ValidationErrors{}
 
 		// 检查条件
@@ -64,6 +89,10 @@ func (v *AbstractValidator[T]) Field(selector func(*T) string) *StringRuleBuilde
 		for _, rule := range baseBuilder.rules {
 			if err := rule(instance); err != nil {
 				errors = append(errors, *err)
+				// 快速失败模式：遇到错误立即返回
+				if mode == ValidateFailFast {
+					return errors
+				}
 			}
 		}
 		return errors
@@ -83,7 +112,7 @@ func (v *AbstractValidator[T]) FieldInt(selector func(*T) int) *RuleBuilder[T, i
 		rules:     make([]func(*T) *ValidationError, 0),
 	}
 
-	v.rules = append(v.rules, func(instance *T) ValidationErrors {
+	v.rules = append(v.rules, func(instance *T, mode ValidateMode) ValidationErrors {
 		errors := ValidationErrors{}
 
 		if builder.condition != nil && !builder.condition(instance) {
@@ -93,6 +122,10 @@ func (v *AbstractValidator[T]) FieldInt(selector func(*T) int) *RuleBuilder[T, i
 		for _, rule := range builder.rules {
 			if err := rule(instance); err != nil {
 				errors = append(errors, *err)
+				// 快速失败模式：遇到错误立即返回
+				if mode == ValidateFailFast {
+					return errors
+				}
 			}
 		}
 		return errors
@@ -112,7 +145,7 @@ func (v *AbstractValidator[T]) FieldInt64(selector func(*T) int64) *RuleBuilder[
 		rules:     make([]func(*T) *ValidationError, 0),
 	}
 
-	v.rules = append(v.rules, func(instance *T) ValidationErrors {
+	v.rules = append(v.rules, func(instance *T, mode ValidateMode) ValidationErrors {
 		errors := ValidationErrors{}
 
 		if builder.condition != nil && !builder.condition(instance) {
@@ -122,6 +155,10 @@ func (v *AbstractValidator[T]) FieldInt64(selector func(*T) int64) *RuleBuilder[
 		for _, rule := range builder.rules {
 			if err := rule(instance); err != nil {
 				errors = append(errors, *err)
+				// 快速失败模式：遇到错误立即返回
+				if mode == ValidateFailFast {
+					return errors
+				}
 			}
 		}
 		return errors
@@ -141,7 +178,7 @@ func (v *AbstractValidator[T]) FieldFloat64(selector func(*T) float64) *RuleBuil
 		rules:     make([]func(*T) *ValidationError, 0),
 	}
 
-	v.rules = append(v.rules, func(instance *T) ValidationErrors {
+	v.rules = append(v.rules, func(instance *T, mode ValidateMode) ValidationErrors {
 		errors := ValidationErrors{}
 
 		if builder.condition != nil && !builder.condition(instance) {
@@ -151,6 +188,10 @@ func (v *AbstractValidator[T]) FieldFloat64(selector func(*T) float64) *RuleBuil
 		for _, rule := range builder.rules {
 			if err := rule(instance); err != nil {
 				errors = append(errors, *err)
+				// 快速失败模式：遇到错误立即返回
+				if mode == ValidateFailFast {
+					return errors
+				}
 			}
 		}
 		return errors
@@ -170,7 +211,7 @@ func FieldSlice[T any, TItem any](v *AbstractValidator[T], selector func(*T) []T
 		rules:     make([]func(*T) *ValidationError, 0),
 	}
 
-	v.rules = append(v.rules, func(instance *T) ValidationErrors {
+	v.rules = append(v.rules, func(instance *T, mode ValidateMode) ValidationErrors {
 		errors := ValidationErrors{}
 
 		if builder.condition != nil && !builder.condition(instance) {
@@ -180,6 +221,10 @@ func FieldSlice[T any, TItem any](v *AbstractValidator[T], selector func(*T) []T
 		for _, rule := range builder.rules {
 			if err := rule(instance); err != nil {
 				errors = append(errors, *err)
+				// 快速失败模式：遇到错误立即返回
+				if mode == ValidateFailFast {
+					return errors
+				}
 			}
 		}
 		return errors

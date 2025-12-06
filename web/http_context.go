@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gocrud/csgo/errors"
 	"github.com/gocrud/csgo/validation"
 )
 
@@ -75,6 +76,26 @@ func (c *HttpContext) InternalError(message string) IActionResult {
 // Error returns a custom error response.
 func (c *HttpContext) Error(statusCode int, code, message string) IActionResult {
 	return Error(statusCode, code, message)
+}
+
+// ValidationBadRequest returns 400 Bad Request with validation errors.
+func (c *HttpContext) ValidationBadRequest(errs validation.ValidationErrors) IActionResult {
+	return ValidationBadRequest(errs)
+}
+
+// ValidationBadRequestWithCode returns 400 Bad Request with validation errors and custom code.
+func (c *HttpContext) ValidationBadRequestWithCode(code string, errs validation.ValidationErrors) IActionResult {
+	return ValidationBadRequestWithCode(code, errs)
+}
+
+// BizError returns a business error with auto-mapped HTTP status code.
+func (c *HttpContext) BizError(err *errors.BizError) IActionResult {
+	return BizError(err)
+}
+
+// BizErrorWithStatus returns a business error with specified HTTP status code.
+func (c *HttpContext) BizErrorWithStatus(statusCode int, err *errors.BizError) IActionResult {
+	return BizErrorWithStatus(statusCode, err)
 }
 
 // ==================== Parameter Helpers ====================
@@ -162,30 +183,31 @@ func (c *HttpContext) BindQuery(target interface{}) (ok bool, result IActionResu
 
 // BindAndValidate binds JSON body and validates using FluentValidation validator.
 // Returns the bound object and nil if successful, or nil and an error result if failed.
+// 自动使用注册验证器的模式（快速失败或全量验证）
 func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
 	var target T
-	
+
 	// 1. 绑定 JSON
 	if err := c.ShouldBindJSON(&target); err != nil {
 		return nil, c.BadRequest(err.Error())
 	}
-	
-	// 2. 查找注册的验证器
+
+	// 2. 查找注册的验证器并执行验证
 	if validator, ok := validation.GetValidator[T](); ok {
 		result := validator.Validate(&target)
 		if !result.IsValid {
-			// 返回验证错误
-			return nil, c.BadRequest(result.Errors.Error())
+			// 返回结构化的验证错误
+			return nil, c.ValidationBadRequest(result.Errors)
 		}
 	}
-	
+
 	// 3. 如果实现了 Validator 接口，也调用
 	if v, ok := any(&target).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
 			return nil, c.BadRequest(err.Error())
 		}
 	}
-	
+
 	return &target, nil
 }
 
@@ -197,4 +219,3 @@ func (c *HttpContext) ValidateStruct(target interface{}) IActionResult {
 	// 建议直接使用 BindAndValidate[T] 泛型方法
 	return nil
 }
-

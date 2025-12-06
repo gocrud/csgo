@@ -2,6 +2,8 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gocrud/csgo/errors"
+	"github.com/gocrud/csgo/validation"
 )
 
 // IActionResult represents the result of an action method.
@@ -20,8 +22,10 @@ type ApiResponse struct {
 
 // ApiError represents an error in the API response.
 type ApiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code    string                       `json:"code"`              // 错误码
+	Message string                       `json:"message"`           // 错误消息
+	Fields  []validation.ValidationError `json:"fields,omitempty"`  // 验证错误字段列表
+	Details map[string]interface{}       `json:"details,omitempty"` // 额外详情（可选）
 }
 
 // ==================== Success Results ====================
@@ -147,6 +151,138 @@ func Conflict(message string) IActionResult {
 // InternalError creates a 500 Internal Server Error result.
 func InternalError(message string) IActionResult {
 	return ErrorResult{StatusCode: 500, Code: "INTERNAL_ERROR", Message: message}
+}
+
+// ==================== Validation Error Results ====================
+
+// ValidationErrorResult represents a validation error response.
+type ValidationErrorResult struct {
+	StatusCode int
+	Errors     validation.ValidationErrors
+}
+
+// ExecuteResult implements IActionResult.
+func (r ValidationErrorResult) ExecuteResult(c *gin.Context) {
+	c.JSON(r.StatusCode, ApiResponse{
+		Success: false,
+		Error: &ApiError{
+			Code:    errors.ValidationFailed,
+			Message: "验证失败",
+			Fields:  r.Errors,
+		},
+	})
+}
+
+// ValidationBadRequest creates a 400 Bad Request result with validation errors.
+func ValidationBadRequest(errs validation.ValidationErrors) IActionResult {
+	return ValidationErrorResult{StatusCode: 400, Errors: errs}
+}
+
+// ValidationBadRequestWithCode creates a 400 Bad Request result with validation errors and custom code.
+func ValidationBadRequestWithCode(code string, errs validation.ValidationErrors) IActionResult {
+	return &customValidationErrorResult{
+		StatusCode: 400,
+		Code:       code,
+		Errors:     errs,
+	}
+}
+
+// customValidationErrorResult for custom error codes
+type customValidationErrorResult struct {
+	StatusCode int
+	Code       string
+	Errors     validation.ValidationErrors
+}
+
+// ExecuteResult implements IActionResult.
+func (r customValidationErrorResult) ExecuteResult(c *gin.Context) {
+	c.JSON(r.StatusCode, ApiResponse{
+		Success: false,
+		Error: &ApiError{
+			Code:    r.Code,
+			Message: "验证失败",
+			Fields:  r.Errors,
+		},
+	})
+}
+
+// ==================== Business Error Results ====================
+
+// BizErrorResult represents a business error response.
+type BizErrorResult struct {
+	StatusCode int
+	BizError   *errors.BizError
+}
+
+// ExecuteResult implements IActionResult.
+func (r BizErrorResult) ExecuteResult(c *gin.Context) {
+	c.JSON(r.StatusCode, ApiResponse{
+		Success: false,
+		Error: &ApiError{
+			Code:    r.BizError.Code,
+			Message: r.BizError.Message,
+		},
+	})
+}
+
+// BizError creates a business error result with auto-mapped HTTP status code.
+// Maps common error patterns to appropriate HTTP status codes:
+// - NOT_FOUND -> 404
+// - ALREADY_EXISTS -> 409
+// - PERMISSION_DENIED -> 403
+// - INVALID_* -> 400
+// - Default -> 400
+func BizError(err *errors.BizError) IActionResult {
+	statusCode := mapBizErrorToStatusCode(err.Code)
+	return BizErrorResult{StatusCode: statusCode, BizError: err}
+}
+
+// BizErrorWithStatus creates a business error result with specified HTTP status code.
+func BizErrorWithStatus(statusCode int, err *errors.BizError) IActionResult {
+	return BizErrorResult{StatusCode: statusCode, BizError: err}
+}
+
+// mapBizErrorToStatusCode maps error code to HTTP status code
+func mapBizErrorToStatusCode(code string) int {
+	switch {
+	case containsPattern(code, "NOT_FOUND"):
+		return 404
+	case containsPattern(code, "ALREADY_EXISTS"):
+		return 409
+	case containsPattern(code, "PERMISSION_DENIED"):
+		return 403
+	case containsPattern(code, "UNAUTHORIZED"):
+		return 401
+	case containsPattern(code, "FORBIDDEN"):
+		return 403
+	case containsPattern(code, "INVALID"):
+		return 400
+	case containsPattern(code, "EXPIRED"):
+		return 410
+	case containsPattern(code, "LOCKED"):
+		return 423
+	case containsPattern(code, "LIMIT_EXCEEDED"):
+		return 429
+	default:
+		return 400
+	}
+}
+
+// containsPattern checks if code contains pattern
+func containsPattern(code, pattern string) bool {
+	return len(code) >= len(pattern) &&
+		(code[len(code)-len(pattern):] == pattern ||
+			containsSubstring(code, "."+pattern))
+}
+
+// containsSubstring simple substring check
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // ==================== JSON Result ====================

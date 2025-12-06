@@ -1,6 +1,10 @@
 package validation
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/gocrud/csgo/errors"
+)
 
 // Number 表示可比较的数字类型约束
 type Number interface {
@@ -17,6 +21,7 @@ func GreaterThan[T any, TProperty Number](b *RuleBuilder[T, TProperty], value TP
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: fmt.Sprintf("必须大于 %v", value),
+				Code:    errors.ValidationMin,
 			}
 		}
 		return nil
@@ -32,6 +37,7 @@ func GreaterThanOrEqual[T any, TProperty Number](b *RuleBuilder[T, TProperty], v
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: fmt.Sprintf("必须大于或等于 %v", value),
+				Code:    errors.ValidationMin,
 			}
 		}
 		return nil
@@ -47,6 +53,7 @@ func LessThan[T any, TProperty Number](b *RuleBuilder[T, TProperty], value TProp
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: fmt.Sprintf("必须小于 %v", value),
+				Code:    errors.ValidationMax,
 			}
 		}
 		return nil
@@ -62,6 +69,7 @@ func LessThanOrEqual[T any, TProperty Number](b *RuleBuilder[T, TProperty], valu
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: fmt.Sprintf("必须小于或等于 %v", value),
+				Code:    errors.ValidationMax,
 			}
 		}
 		return nil
@@ -77,6 +85,7 @@ func InclusiveBetween[T any, TProperty Number](b *RuleBuilder[T, TProperty], min
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: fmt.Sprintf("必须在 %v 到 %v 之间", min, max),
+				Code:    errors.ValidationRange,
 			}
 		}
 		return nil
@@ -92,6 +101,7 @@ func ExclusiveBetween[T any, TProperty Number](b *RuleBuilder[T, TProperty], min
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: fmt.Sprintf("必须在 %v 和 %v 之间（不包含边界）", min, max),
+				Code:    errors.ValidationRange,
 			}
 		}
 		return nil
@@ -107,6 +117,7 @@ func MustNumber[T any, TProperty Number](b *RuleBuilder[T, TProperty], predicate
 			return &ValidationError{
 				Field:   b.fieldName,
 				Message: "验证失败",
+				Code:    errors.ValidationFailed,
 			}
 		}
 		return nil
