@@ -25,7 +25,7 @@ type ApiError struct {
 	Code    string                       `json:"code"`              // 错误码
 	Message string                       `json:"message"`           // 错误消息
 	Fields  []validation.ValidationError `json:"fields,omitempty"`  // 验证错误字段列表
-	Details map[string]interface{}       `json:"details,omitempty"` // 额外详情（可选）
+	Details M                            `json:"details,omitempty"` // 额外详情（可选）
 }
 
 // ==================== Success Results ====================
@@ -216,12 +216,17 @@ type BizErrorResult struct {
 
 // ExecuteResult implements IActionResult.
 func (r BizErrorResult) ExecuteResult(c *gin.Context) {
+	apiError := &ApiError{
+		Code:    r.BizError.Code,
+		Message: r.BizError.Message,
+	}
+	// 包含 Details 字段（如果有）
+	if len(r.BizError.Details) > 0 {
+		apiError.Details = r.BizError.Details
+	}
 	c.JSON(r.StatusCode, ApiResponse{
 		Success: false,
-		Error: &ApiError{
-			Code:    r.BizError.Code,
-			Message: r.BizError.Message,
-		},
+		Error:   apiError,
 	})
 }
 

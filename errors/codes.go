@@ -65,6 +65,24 @@ const (
 	// ValidationMaxCount 集合元素数量大于最大值
 	ValidationMaxCount = "VALIDATION.MAX_COUNT"
 
+	// ValidationInvalidInteger 无效的整数
+	ValidationInvalidInteger = "VALIDATION.INVALID_INTEGER"
+
+	// ValidationInvalidBoolean 无效的布尔值
+	ValidationInvalidBoolean = "VALIDATION.INVALID_BOOLEAN"
+
+	// ValidationInvalidNumber 无效的数字
+	ValidationInvalidNumber = "VALIDATION.INVALID_NUMBER"
+
+	// ValidationPositive 必须是正数
+	ValidationPositive = "VALIDATION.POSITIVE"
+
+	// ValidationNonNegative 不能是负数
+	ValidationNonNegative = "VALIDATION.NON_NEGATIVE"
+
+	// ValidationEnum 枚举值验证失败
+	ValidationEnum = "VALIDATION.ENUM"
+
 	// ========== HTTP 错误 (HTTP.*) ==========
 
 	// HttpBadRequest 错误的请求
