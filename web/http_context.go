@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"io"
 	"strings"
 
@@ -23,6 +24,11 @@ func NewHttpContext(c *gin.Context) *HttpContext {
 // RawCtx returns the underlying gin.Context.
 func (c *HttpContext) RawCtx() *gin.Context {
 	return c.gin
+}
+
+// Context returns the request's context.
+func (c *HttpContext) Context() context.Context {
+	return c.gin.Request.Context()
 }
 
 // ==================== Success Responses ====================
