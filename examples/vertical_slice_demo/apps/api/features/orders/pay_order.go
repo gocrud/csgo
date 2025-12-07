@@ -1,17 +1,18 @@
 package orders
 
 import (
-	"github.com/gocrud/csgo/web"
 	"vertical_slice_demo/shared/contracts/repositories"
 	"vertical_slice_demo/shared/contracts/services"
+
+	"github.com/gocrud/csgo/web"
 )
 
 // PayOrderHandler 支付订单处理器（展示共享服务的使用）
 type PayOrderHandler struct {
-	orderRepo          repositories.IOrderRepository
-	paymentService     services.IPaymentService
+	orderRepo           repositories.IOrderRepository
+	paymentService      services.IPaymentService
 	notificationService services.INotificationService
-	userRepo           repositories.IUserRepository
+	userRepo            repositories.IUserRepository
 }
 
 // NewPayOrderHandler 创建支付订单处理器
@@ -22,10 +23,10 @@ func NewPayOrderHandler(
 	userRepo repositories.IUserRepository,
 ) *PayOrderHandler {
 	return &PayOrderHandler{
-		orderRepo:          orderRepo,
-		paymentService:     paymentService,
+		orderRepo:           orderRepo,
+		paymentService:      paymentService,
 		notificationService: notificationService,
-		userRepo:           userRepo,
+		userRepo:            userRepo,
 	}
 }
 
@@ -37,9 +38,9 @@ type PayOrderRequest struct {
 // Handle 处理支付订单请求
 func (h *PayOrderHandler) Handle(c *web.HttpContext) web.IActionResult {
 	// 获取订单 ID
-	orderID, err := c.PathInt64("id")
-	if err != nil {
-		return c.BadRequest("无效的订单 ID")
+	orderID := c.Params().PathInt64("id").Positive().Value()
+	if err := c.Params().Check(); err != nil {
+		return err
 	}
 
 	// 绑定请求
@@ -94,4 +95,3 @@ func (h *PayOrderHandler) Handle(c *web.HttpContext) web.IActionResult {
 
 	return c.Ok(paymentResult)
 }
-

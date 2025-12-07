@@ -1,8 +1,9 @@
 package users
 
 import (
-	"github.com/gocrud/csgo/web"
 	"vertical_slice_demo/shared/contracts/repositories"
+
+	"github.com/gocrud/csgo/web"
 )
 
 // UpdateUserHandler 更新用户处理器
@@ -24,9 +25,9 @@ type UpdateUserRequest struct {
 // Handle 处理更新用户请求
 func (h *UpdateUserHandler) Handle(c *web.HttpContext) web.IActionResult {
 	// 获取用户 ID
-	id, err := c.PathInt64("id")
-	if err != nil {
-		return c.BadRequest("无效的用户 ID")
+	id := c.Params().PathInt64("id").Positive().Value()
+	if err := c.Params().Check(); err != nil {
+		return err
 	}
 
 	// 绑定请求
@@ -52,4 +53,3 @@ func (h *UpdateUserHandler) Handle(c *web.HttpContext) web.IActionResult {
 
 	return c.Ok(user)
 }
-

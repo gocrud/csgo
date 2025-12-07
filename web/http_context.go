@@ -2,7 +2,6 @@ package web
 
 import (
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -11,14 +10,19 @@ import (
 )
 
 // HttpContext wraps gin.Context and provides unified API for HTTP handling.
-// It embeds gin.Context so all original methods are still available.
+// Access the underlying gin.Context via RawCtx() method.
 type HttpContext struct {
-	*gin.Context
+	gin *gin.Context
 }
 
 // NewHttpContext creates a new HttpContext from gin.Context.
 func NewHttpContext(c *gin.Context) *HttpContext {
-	return &HttpContext{Context: c}
+	return &HttpContext{gin: c}
+}
+
+// RawCtx returns the underlying gin.Context.
+func (c *HttpContext) RawCtx() *gin.Context {
+	return c.gin
 }
 
 // ==================== Success Responses ====================
@@ -100,65 +104,12 @@ func (c *HttpContext) BizErrorWithStatus(statusCode int, err *errors.BizError) I
 	return BizErrorWithStatus(statusCode, err)
 }
 
-// ==================== Parameter Helpers ====================
-
-// PathInt gets path parameter and converts to int.
-// Returns error if conversion fails.
-func (c *HttpContext) PathInt(key string) (int, error) {
-	return strconv.Atoi(c.Param(key))
-}
-
-// PathInt64 gets path parameter and converts to int64.
-func (c *HttpContext) PathInt64(key string) (int64, error) {
-	return strconv.ParseInt(c.Param(key), 10, 64)
-}
-
-// MustPathInt gets path parameter and converts to int.
-// Returns BadRequest result if conversion fails.
-func (c *HttpContext) MustPathInt(key string) (int, IActionResult) {
-	val, err := strconv.Atoi(c.Param(key))
-	if err != nil {
-		return 0, c.BadRequest("Invalid " + key + ": must be an integer")
-	}
-	return val, nil
-}
-
-// QueryInt gets query parameter and converts to int with default value.
-func (c *HttpContext) QueryInt(key string, defaultValue int) int {
-	if val := c.Query(key); val != "" {
-		if i, err := strconv.Atoi(val); err == nil {
-			return i
-		}
-	}
-	return defaultValue
-}
-
-// QueryInt64 gets query parameter and converts to int64 with default value.
-func (c *HttpContext) QueryInt64(key string, defaultValue int64) int64 {
-	if val := c.Query(key); val != "" {
-		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-			return i
-		}
-	}
-	return defaultValue
-}
-
-// QueryBool gets query parameter and converts to bool with default value.
-func (c *HttpContext) QueryBool(key string, defaultValue bool) bool {
-	if val := c.Query(key); val != "" {
-		if b, err := strconv.ParseBool(val); err == nil {
-			return b
-		}
-	}
-	return defaultValue
-}
-
 // ==================== Binding Helpers ====================
 
 // BindJSON binds JSON body to target and returns BadRequest if failed.
 // Returns true if binding succeeded, false otherwise.
 func (c *HttpContext) BindJSON(target interface{}) (ok bool, result IActionResult) {
-	if err := c.ShouldBindJSON(target); err != nil {
+	if err := c.gin.ShouldBindJSON(target); err != nil {
 		// 检查是否为 EOF 错误(空请求体)
 		if err == io.EOF || err.Error() == "EOF" {
 			return false, c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
@@ -186,7 +137,7 @@ func (c *HttpContext) BindJSON(target interface{}) (ok bool, result IActionResul
 // MustBindJSON binds JSON body to target and returns BadRequest if failed.
 // This is a convenience method that returns only the error result.
 func (c *HttpContext) MustBindJSON(target interface{}) IActionResult {
-	if err := c.ShouldBindJSON(target); err != nil {
+	if err := c.gin.ShouldBindJSON(target); err != nil {
 		// 检查是否为 EOF 错误(空请求体)
 		if err == io.EOF || err.Error() == "EOF" {
 			return c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
@@ -213,7 +164,7 @@ func (c *HttpContext) MustBindJSON(target interface{}) IActionResult {
 
 // BindQuery binds query parameters to target and returns BadRequest if failed.
 func (c *HttpContext) BindQuery(target interface{}) (ok bool, result IActionResult) {
-	if err := c.ShouldBindQuery(target); err != nil {
+	if err := c.gin.ShouldBindQuery(target); err != nil {
 		return false, c.BadRequest(err.Error())
 	}
 	return true, nil
@@ -228,7 +179,7 @@ func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
 	var target T
 
 	// 1. 绑定 JSON,增强错误处理
-	if err := c.ShouldBindJSON(&target); err != nil {
+	if err := c.gin.ShouldBindJSON(&target); err != nil {
 		// 检查是否为 EOF 错误(空请求体)
 		if err == io.EOF || err.Error() == "EOF" {
 			return nil, c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")

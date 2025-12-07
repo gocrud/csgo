@@ -1,11 +1,10 @@
 package products
 
 import (
-	"strconv"
-
-	"github.com/gocrud/csgo/web"
 	"vertical_slice_demo/shared/contracts/repositories"
 	"vertical_slice_demo/shared/domain"
+
+	"github.com/gocrud/csgo/web"
 )
 
 // ListProductsHandler 商品列表处理器
@@ -27,21 +26,10 @@ type ListProductsResponse struct {
 // Handle 处理商品列表请求
 func (h *ListProductsHandler) Handle(c *web.HttpContext) web.IActionResult {
 	// 获取分页参数
-	offset := 0
-	limit := 20
-	status := c.Query("status") // 可选的状态过滤
-
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if v, err := strconv.Atoi(offsetStr); err == nil {
-			offset = v
-		}
-	}
-
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 100 {
-			limit = v
-		}
-	}
+	p := c.Params()
+	offset := p.QueryInt("offset").NonNegative().ValueOr(0)
+	limit := p.QueryInt("limit").Range(1, 100).ValueOr(20)
+	status := p.QueryString("status").ValueOr("") // 可选的状态过滤
 
 	// 查询商品列表
 	products, err := h.productRepo.List(offset, limit, status)
@@ -56,4 +44,3 @@ func (h *ListProductsHandler) Handle(c *web.HttpContext) web.IActionResult {
 
 	return c.Ok(response)
 }
-

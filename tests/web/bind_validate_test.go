@@ -39,7 +39,7 @@ func TestBindAndValidate_EmptyBody(t *testing.T) {
 	assert.Nil(t, result, "结果应该为 nil")
 	assert.NotNil(t, errResult, "应该返回错误结果")
 
-	errResult.ExecuteResult(httpCtx.Context)
+	errResult.ExecuteResult(httpCtx.RawCtx())
 
 	assert.Equal(t, http.StatusBadRequest, w.Code, "应该返回 400 状态码")
 
@@ -72,7 +72,7 @@ func TestBindAndValidate_IncompleteJSON(t *testing.T) {
 			assert.Nil(t, result, "结果应该为 nil")
 			assert.NotNil(t, errResult, "应该返回错误结果")
 
-			errResult.ExecuteResult(httpCtx.Context)
+			errResult.ExecuteResult(httpCtx.RawCtx())
 			assert.Equal(t, http.StatusBadRequest, w.Code)
 
 			var response map[string]interface{}
@@ -107,7 +107,7 @@ func TestBindAndValidate_InvalidJSON(t *testing.T) {
 			assert.Nil(t, result)
 			assert.NotNil(t, errResult)
 
-			errResult.ExecuteResult(httpCtx.Context)
+			errResult.ExecuteResult(httpCtx.RawCtx())
 			assert.Equal(t, http.StatusBadRequest, w.Code)
 
 			var response map[string]interface{}
@@ -130,7 +130,7 @@ func TestBindAndValidate_TypeMismatch(t *testing.T) {
 	assert.Nil(t, result)
 	assert.NotNil(t, errResult)
 
-	errResult.ExecuteResult(httpCtx.Context)
+	errResult.ExecuteResult(httpCtx.RawCtx())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	var response map[string]interface{}
@@ -178,7 +178,7 @@ func TestMustBindJSON_EmptyBody(t *testing.T) {
 
 	assert.NotNil(t, errResult, "应该返回错误")
 
-	errResult.ExecuteResult(httpCtx.Context)
+	errResult.ExecuteResult(httpCtx.RawCtx())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	var response map[string]interface{}
@@ -197,7 +197,7 @@ func TestMustBindJSON_IncompleteJSON(t *testing.T) {
 
 	assert.NotNil(t, errResult)
 
-	errResult.ExecuteResult(httpCtx.Context)
+	errResult.ExecuteResult(httpCtx.RawCtx())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	var response map[string]interface{}
@@ -232,7 +232,7 @@ func TestBindJSON_EmptyBody(t *testing.T) {
 	assert.False(t, ok, "绑定应该失败")
 	assert.NotNil(t, errResult, "应该返回错误")
 
-	errResult.ExecuteResult(httpCtx.Context)
+	errResult.ExecuteResult(httpCtx.RawCtx())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	var response map[string]interface{}
@@ -268,7 +268,7 @@ func TestBindJSON_InvalidJSON(t *testing.T) {
 	assert.False(t, ok)
 	assert.NotNil(t, errResult)
 
-	errResult.ExecuteResult(httpCtx.Context)
+	errResult.ExecuteResult(httpCtx.RawCtx())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	var response map[string]interface{}

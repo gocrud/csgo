@@ -1,11 +1,10 @@
 package orders
 
 import (
-	"strconv"
-
-	"github.com/gocrud/csgo/web"
 	"vertical_slice_demo/shared/contracts/repositories"
 	"vertical_slice_demo/shared/domain"
+
+	"github.com/gocrud/csgo/web"
 )
 
 // MyOrdersHandler 我的订单处理器
@@ -30,20 +29,9 @@ func (h *MyOrdersHandler) Handle(c *web.HttpContext) web.IActionResult {
 	userID := int64(1) // 假设当前用户 ID 为 1
 
 	// 获取分页参数
-	offset := 0
-	limit := 20
-
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if v, err := strconv.Atoi(offsetStr); err == nil {
-			offset = v
-		}
-	}
-
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 100 {
-			limit = v
-		}
-	}
+	p := c.Params()
+	offset := p.QueryInt("offset").NonNegative().ValueOr(0)
+	limit := p.QueryInt("limit").Range(1, 100).ValueOr(20)
 
 	// 查询订单列表
 	orders, err := h.orderRepo.GetByUserID(userID, offset, limit)
@@ -58,4 +46,3 @@ func (h *MyOrdersHandler) Handle(c *web.HttpContext) web.IActionResult {
 
 	return c.Ok(response)
 }
-

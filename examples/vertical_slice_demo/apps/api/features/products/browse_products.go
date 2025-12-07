@@ -1,11 +1,10 @@
 package products
 
 import (
-	"strconv"
-
-	"github.com/gocrud/csgo/web"
 	"vertical_slice_demo/shared/contracts/repositories"
 	"vertical_slice_demo/shared/domain"
+
+	"github.com/gocrud/csgo/web"
 )
 
 // BrowseProductsHandler 浏览商品处理器（C端视角）
@@ -36,20 +35,9 @@ type BrowseProductsResponse struct {
 // Handle 处理浏览商品请求
 func (h *BrowseProductsHandler) Handle(c *web.HttpContext) web.IActionResult {
 	// 获取分页参数
-	offset := 0
-	limit := 20
-
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if v, err := strconv.Atoi(offsetStr); err == nil {
-			offset = v
-		}
-	}
-
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 100 {
-			limit = v
-		}
-	}
+	p := c.Params()
+	offset := p.QueryInt("offset").NonNegative().ValueOr(0)
+	limit := p.QueryInt("limit").Range(1, 100).ValueOr(20)
 
 	// 查询商品列表（C端只显示 active 状态的商品）
 	products, err := h.productRepo.List(offset, limit, "active")
@@ -99,9 +87,9 @@ type ProductDetail struct {
 // Handle 处理获取商品详情请求
 func (h *GetProductDetailHandler) Handle(c *web.HttpContext) web.IActionResult {
 	// 获取商品 ID
-	id, err := c.PathInt64("id")
-	if err != nil {
-		return c.BadRequest("无效的商品 ID")
+	id := c.Params().PathInt64("id").Positive().Value()
+	if err := c.Params().Check(); err != nil {
+		return err
 	}
 
 	// 查询商品
@@ -136,4 +124,3 @@ func toProductListItem(product *domain.Product) ProductListItem {
 		InStock:     product.Stock > 0,
 	}
 }
-

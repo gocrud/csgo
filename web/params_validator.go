@@ -27,7 +27,7 @@ func (c *HttpContext) Params() *ParamValidator {
 
 // PathString 获取并验证 path 字符串参数
 func (v *ParamValidator) PathString(key string) *StringParamRule {
-	value := v.ctx.Param(key)
+	value := v.ctx.gin.Param(key)
 	return &StringParamRule{
 		validator: v,
 		key:       key,
@@ -39,7 +39,7 @@ func (v *ParamValidator) PathString(key string) *StringParamRule {
 
 // PathInt 获取并验证 path 整数参数
 func (v *ParamValidator) PathInt(key string) *IntParamRule {
-	valueStr := v.ctx.Param(key)
+	valueStr := v.ctx.gin.Param(key)
 	value, err := strconv.Atoi(valueStr)
 
 	rule := &IntParamRule{
@@ -61,7 +61,7 @@ func (v *ParamValidator) PathInt(key string) *IntParamRule {
 
 // PathInt64 获取并验证 path int64 参数
 func (v *ParamValidator) PathInt64(key string) *Int64ParamRule {
-	valueStr := v.ctx.Param(key)
+	valueStr := v.ctx.gin.Param(key)
 	value, err := strconv.ParseInt(valueStr, 10, 64)
 
 	rule := &Int64ParamRule{
@@ -84,7 +84,7 @@ func (v *ParamValidator) PathInt64(key string) *Int64ParamRule {
 
 // QueryString 获取并验证 query 字符串参数
 func (v *ParamValidator) QueryString(key string) *StringParamRule {
-	value := v.ctx.Query(key)
+	value := v.ctx.gin.Query(key)
 	return &StringParamRule{
 		validator: v,
 		key:       key,
@@ -96,7 +96,7 @@ func (v *ParamValidator) QueryString(key string) *StringParamRule {
 
 // QueryInt 获取并验证 query 整数参数
 func (v *ParamValidator) QueryInt(key string) *IntParamRule {
-	valueStr := v.ctx.Query(key)
+	valueStr := v.ctx.gin.Query(key)
 
 	rule := &IntParamRule{
 		validator: v,
@@ -121,7 +121,7 @@ func (v *ParamValidator) QueryInt(key string) *IntParamRule {
 
 // QueryInt64 获取并验证 query int64 参数
 func (v *ParamValidator) QueryInt64(key string) *Int64ParamRule {
-	valueStr := v.ctx.Query(key)
+	valueStr := v.ctx.gin.Query(key)
 
 	rule := &Int64ParamRule{
 		validator: v,
@@ -145,7 +145,7 @@ func (v *ParamValidator) QueryInt64(key string) *Int64ParamRule {
 
 // QueryBool 获取并验证 query 布尔参数
 func (v *ParamValidator) QueryBool(key string) *BoolParamRule {
-	valueStr := v.ctx.Query(key)
+	valueStr := v.ctx.gin.Query(key)
 
 	rule := &BoolParamRule{
 		validator: v,
@@ -169,7 +169,7 @@ func (v *ParamValidator) QueryBool(key string) *BoolParamRule {
 
 // QueryFloat 获取并验证 query 浮点数参数
 func (v *ParamValidator) QueryFloat(key string) *FloatParamRule {
-	valueStr := v.ctx.Query(key)
+	valueStr := v.ctx.gin.Query(key)
 
 	rule := &FloatParamRule{
 		validator: v,
@@ -195,7 +195,7 @@ func (v *ParamValidator) QueryFloat(key string) *FloatParamRule {
 
 // HeaderString 获取并验证 header 字符串参数
 func (v *ParamValidator) HeaderString(key string) *StringParamRule {
-	value := v.ctx.GetHeader(key)
+	value := v.ctx.gin.GetHeader(key)
 	return &StringParamRule{
 		validator: v,
 		key:       key,
@@ -207,7 +207,7 @@ func (v *ParamValidator) HeaderString(key string) *StringParamRule {
 
 // HeaderInt 获取并验证 header 整数参数
 func (v *ParamValidator) HeaderInt(key string) *IntParamRule {
-	valueStr := v.ctx.GetHeader(key)
+	valueStr := v.ctx.gin.GetHeader(key)
 
 	rule := &IntParamRule{
 		validator: v,
