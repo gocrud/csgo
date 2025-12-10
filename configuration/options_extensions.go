@@ -2,21 +2,36 @@ package configuration
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/gocrud/csgo/di"
 )
 
 // Configure registers configuration instance T with the DI container.
-// It binds the configuration to the specified section and enables hot reload through IOptionsMonitor[T].
-// Also registers *T for static snapshot injection.
+// It binds the configuration to the specified section and registers IOptions[T], IOptionsMonitor[T], IOptionsSnapshot[T], and T itself.
+// Corresponds to .NET services.Configure<T>(configuration.GetSection(...)).
+//
+// This function registers both the Options pattern (IOptions[T]) and direct injection (T),
+// allowing services to choose their preferred injection style.
 //
 // Usage:
 //
-//	configuration.Configure[AppSettings](services, config, "App")
-func Configure[T any](services di.IServiceCollection, config IConfiguration, section string) {
+//	configuration.Configure[AppSettings](services, "App")
+//	configuration.Configure[Config](services, "") // bind root configuration
+//
+// Injection styles:
+//
+//	// Style 1: Standard .NET Options pattern
+//	type Service1 struct {
+//	    config IOptions[AppSettings]
+//	}
+//
+//	// Style 2: Direct injection
+//	type Service2 struct {
+//	    config AppSettings
+//	}
+func Configure[T any](services di.IServiceCollection, section string) {
 	// Register IOptions[T] as singleton
-	services.AddSingleton(func() IOptions[T] {
+	services.AddSingleton(func(config IConfiguration) IOptions[T] {
 		var opts T
 		if err := config.Bind(section, &opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -24,8 +39,8 @@ func Configure[T any](services di.IServiceCollection, config IConfiguration, sec
 		return NewOptions(&opts)
 	})
 
-	// Register IOptionsMonitor[T] as singleton
-	services.AddSingleton(func() IOptionsMonitor[T] {
+	// Register IOptionsMonitor[T] as singleton (supports hot reload)
+	services.AddSingleton(func(config IConfiguration) IOptionsMonitor[T] {
 		var opts T
 		if err := config.Bind(section, &opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -42,22 +57,38 @@ func Configure[T any](services di.IServiceCollection, config IConfiguration, sec
 
 		return monitor
 	})
+
+	// Register IOptionsSnapshot[T] as transient (new instance per request)
+	// TODO: di ServiceLifetime Scoped ?
+	services.AddTransient(func(config IConfiguration) IOptionsSnapshot[T] {
+		var opts T
+		if err := config.Bind(section, &opts); err != nil {
+			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
+		}
+		return NewOptionsSnapshot(&opts)
+	})
+
+	// Register T directly for constructor injection
+	services.AddSingleton(func(opts IOptions[T]) T {
+		return *opts.Value()
+	})
 }
 
 // ConfigureWithDefaults registers configuration with default values.
 // The defaults are applied first, then overwritten by configuration values.
+// Corresponds to .NET services.Configure<T>() with default values.
 //
 // Usage:
 //
-//	configuration.ConfigureWithDefaults[AppSettings](services, config, "App", func() *AppSettings {
+//	configuration.ConfigureWithDefaults[AppSettings](services, "App", func() *AppSettings {
 //	    return &AppSettings{
 //	        Timeout: 30,
 //	        MaxRetries: 3,
 //	    }
 //	})
-func ConfigureWithDefaults[T any](services di.IServiceCollection, config IConfiguration, section string, defaults func() *T) {
+func ConfigureWithDefaults[T any](services di.IServiceCollection, section string, defaults func() *T) {
 	// Register IOptions[T] as singleton
-	services.AddSingleton(func() IOptions[T] {
+	services.AddSingleton(func(config IConfiguration) IOptions[T] {
 		opts := defaults()
 		if err := config.Bind(section, opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -65,8 +96,8 @@ func ConfigureWithDefaults[T any](services di.IServiceCollection, config IConfig
 		return NewOptions(opts)
 	})
 
-	// Register IOptionsMonitor[T] as singleton
-	services.AddSingleton(func() IOptionsMonitor[T] {
+	// Register IOptionsMonitor[T] as singleton (supports hot reload)
+	services.AddSingleton(func(config IConfiguration) IOptionsMonitor[T] {
 		opts := defaults()
 		if err := config.Bind(section, opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -83,32 +114,37 @@ func ConfigureWithDefaults[T any](services di.IServiceCollection, config IConfig
 
 		return monitor
 	})
+
+	// Register IOptionsSnapshot[T] as transient (new instance per request)
+	services.AddTransient(func(config IConfiguration) IOptionsSnapshot[T] {
+		opts := defaults()
+		if err := config.Bind(section, opts); err != nil {
+			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
+		}
+		return NewOptionsSnapshot(opts)
+	})
+
+	// Register T directly for constructor injection
+	services.AddSingleton(func(opts IOptions[T]) T {
+		return *opts.Value()
+	})
 }
 
 // ConfigureWithValidation registers configuration with validation.
-// Returns an error if validation fails during registration.
+// Validation is performed when the options are resolved from DI.
+// Corresponds to .NET services.AddOptions<T>().Validate(...).
 //
 // Usage:
 //
-//	err := configuration.ConfigureWithValidation[EmailSettings](services, config, "Email", func(opts *EmailSettings) error {
+//	configuration.ConfigureWithValidation[EmailSettings](services, "Email", func(opts *EmailSettings) error {
 //	    if opts.SmtpHost == "" {
 //	        return fmt.Errorf("SMTP host is required")
 //	    }
 //	    return nil
 //	})
-func ConfigureWithValidation[T any](services di.IServiceCollection, config IConfiguration, section string, validator func(*T) error) error {
-	// Validate configuration first
-	var opts T
-	if err := config.Bind(section, &opts); err != nil {
-		return fmt.Errorf("failed to bind configuration section %s: %w", section, err)
-	}
-
-	if err := validator(&opts); err != nil {
-		return fmt.Errorf("configuration validation failed for section %s: %w", section, err)
-	}
-
+func ConfigureWithValidation[T any](services di.IServiceCollection, section string, validator func(*T) error) {
 	// Register IOptions[T] as singleton
-	services.AddSingleton(func() IOptions[T] {
+	services.AddSingleton(func(config IConfiguration) IOptions[T] {
 		var opts T
 		if err := config.Bind(section, &opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -119,11 +155,14 @@ func ConfigureWithValidation[T any](services di.IServiceCollection, config IConf
 		return NewOptions(&opts)
 	})
 
-	// Register IOptionsMonitor[T] as singleton
-	services.AddSingleton(func() IOptionsMonitor[T] {
+	// Register IOptionsMonitor[T] as singleton (supports hot reload)
+	services.AddSingleton(func(config IConfiguration) IOptionsMonitor[T] {
 		var opts T
 		if err := config.Bind(section, &opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
+		}
+		if err := validator(&opts); err != nil {
+			panic(fmt.Sprintf("configuration validation failed for section %s: %v", section, err))
 		}
 		monitor := NewOptionsMonitor(&opts)
 
@@ -140,111 +179,20 @@ func ConfigureWithValidation[T any](services di.IServiceCollection, config IConf
 		return monitor
 	})
 
-	return nil
-}
-
-// GetOptionsType returns the reflect.Type for IOptions[T].
-func GetOptionsType[T any]() reflect.Type {
-	return reflect.TypeOf((*IOptions[T])(nil)).Elem()
-}
-
-// GetOptionsMonitorType returns the reflect.Type for IOptionsMonitor[T].
-func GetOptionsMonitorType[T any]() reflect.Type {
-	return reflect.TypeOf((*IOptionsMonitor[T])(nil)).Elem()
-}
-
-// BindOptions binds configuration to a struct and returns it.
-// This is useful for manual configuration binding without DI.
-//
-// Usage:
-//
-//	opts, err := configuration.BindOptions[AppSettings](config, "App")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-func BindOptions[T any](config IConfiguration, section string) (*T, error) {
-	var opts T
-	if err := config.Bind(section, &opts); err != nil {
-		return nil, err
-	}
-	return &opts, nil
-}
-
-// MustBindOptions is like BindOptions but panics on error.
-//
-// Usage:
-//
-//	opts := configuration.MustBindOptions[AppSettings](config, "App")
-func MustBindOptions[T any](config IConfiguration, section string) *T {
-	var opts T
-	if err := config.Bind(section, &opts); err != nil {
-		panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-	}
-	return &opts
-}
-
-// PostConfigure registers post-configuration action for options.
-// Post-configuration runs after all Configure calls.
-//
-// Usage:
-//
-//	configuration.PostConfigure[AppSettings](services, func(opts *AppSettings) {
-//	    opts.Computed = opts.BaseValue * 2
-//	})
-func PostConfigure[T any](services di.IServiceCollection, configure func(*T)) {
-	// Store post-configuration action
-	// In a full implementation, this would be stored and applied after Configure
-	services.AddSingleton(func() func(*T) {
-		return configure
+	// Register IOptionsSnapshot[T] as transient (new instance per request)
+	services.AddTransient(func(config IConfiguration) IOptionsSnapshot[T] {
+		var opts T
+		if err := config.Bind(section, &opts); err != nil {
+			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
+		}
+		if err := validator(&opts); err != nil {
+			panic(fmt.Sprintf("configuration validation failed for section %s: %v", section, err))
+		}
+		return NewOptionsSnapshot(&opts)
 	})
-}
 
-// ValidateOnStart registers validation that runs when the application starts.
-//
-// Usage:
-//
-//	err := configuration.ValidateOnStart[AppSettings](services, func(opts *AppSettings) error {
-//	    if opts.Timeout <= 0 {
-//	        return fmt.Errorf("timeout must be positive")
-//	    }
-//	    return nil
-//	})
-func ValidateOnStart[T any](services di.IServiceCollection, validator func(*T) error) error {
-	// Register a startup validator
-	// This would be invoked during application startup
-	services.AddSingleton(func() func(*T) error {
-		return validator
-	})
-	return nil
-}
-
-// ConfigureNamed registers named configuration options.
-// Named options allow multiple independent configurations of the same type.
-//
-// Usage:
-//
-//	configuration.ConfigureNamed[DatabaseOptions](services, "Primary", config, "Database:Primary")
-//	configuration.ConfigureNamed[DatabaseOptions](services, "Secondary", config, "Database:Secondary")
-func ConfigureNamed[T any](services di.IServiceCollection, name string, config IConfiguration, section string) {
-	// Register named options
-	services.AddSingleton(func() map[string]IOptions[T] {
-		return make(map[string]IOptions[T])
-	})
-	
-	// Bind and register the named option
-	var opts T
-	if err := config.Bind(section, &opts); err != nil {
-		panic(fmt.Sprintf("failed to bind configuration section %s for name %s: %v", section, name, err))
-	}
-	
-	// Store in named options map
-	services.AddSingleton(func() struct {
-		Name  string
-		Value *T
-	} {
-		return struct {
-			Name  string
-			Value *T
-		}{Name: name, Value: &opts}
+	// Register T directly for constructor injection
+	services.AddSingleton(func(opts IOptions[T]) T {
+		return *opts.Value()
 	})
 }

@@ -11,6 +11,7 @@ import (
 	"vertical_slice_demo/shared/services/notification"
 	"vertical_slice_demo/shared/services/payment"
 
+	"github.com/gocrud/csgo/configuration"
 	"github.com/gocrud/csgo/web"
 )
 
@@ -23,9 +24,8 @@ func Bootstrap() *web.WebApplication {
 		AddEnvironmentVariables("APP_").
 		Build()
 
-	// 绑定配置到结构体
-	var appConfig configs.Config
-	builder.Configuration.Bind("", &appConfig)
+	// 注册配置到 DI 容器（一步完成绑定和注册）
+	configuration.Configure[configs.Config](builder.Services, "")
 
 	// 注册共享基础设施
 	database.AddDatabase(builder.Services)

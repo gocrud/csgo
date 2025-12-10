@@ -753,53 +753,6 @@ func TestYamlConfigurationSource_Load_Optional_NotExists(t *testing.T) {
 }
 
 // =============================================================================
-// BindOptions Tests
-// =============================================================================
-
-func TestBindOptions(t *testing.T) {
-	builder := configuration.NewConfigurationBuilder()
-	builder.AddInMemoryCollection(map[string]string{
-		"Database:host": "localhost",
-		"Database:port": "5432",
-		"Database:name": "testdb",
-	})
-
-	config := builder.Build()
-
-	dbConfig, err := configuration.BindOptions[DatabaseConfig](config, "Database")
-
-	if err != nil {
-		t.Fatalf("BindOptions failed: %v", err)
-	}
-
-	if dbConfig.Host != "localhost" {
-		t.Errorf("expected 'localhost', got '%s'", dbConfig.Host)
-	}
-	if dbConfig.Port != 5432 {
-		t.Errorf("expected 5432, got %d", dbConfig.Port)
-	}
-}
-
-func TestMustBindOptions(t *testing.T) {
-	builder := configuration.NewConfigurationBuilder()
-	builder.AddInMemoryCollection(map[string]string{
-		"App:name":    "TestApp",
-		"App:version": "1.0.0",
-	})
-
-	config := builder.Build()
-
-	appConfig := configuration.MustBindOptions[AppConfig](config, "App")
-
-	if appConfig.Name != "TestApp" {
-		t.Errorf("expected 'TestApp', got '%s'", appConfig.Name)
-	}
-	if appConfig.Version != "1.0.0" {
-		t.Errorf("expected '1.0.0', got '%s'", appConfig.Version)
-	}
-}
-
-// =============================================================================
 // Options Tests
 // =============================================================================
 

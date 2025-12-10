@@ -37,8 +37,8 @@ func CreateDefaultBuilder(args ...string) *HostBuilder {
 
 	// Add default configuration sources
 	configManager.
-		AddJsonFile("appsettings.json", true, true).
-		AddJsonFile("appsettings."+env.Name()+".json", true, true).
+		AddYamlFile("appsettings.yaml", true, true).
+		AddYamlFile("appsettings."+env.Name()+".yaml", true, true).
 		AddEnvironmentVariables("").
 		AddCommandLine(args)
 
