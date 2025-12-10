@@ -56,23 +56,34 @@ func (p *ConfigurationProvider) TryGet(key string) (string, bool) {
 // Set sets a configuration value.
 func (p *ConfigurationProvider) Set(key, value string) {
 	p.mu.Lock()
+	oldToken := p.token
 	p.data[key] = value
+	// Create a new token for future changes
+	p.token = NewChangeToken()
 	p.mu.Unlock()
 
-	// Notify change
-	p.token.SignalChange()
+	// Signal the old token to notify listeners
+	oldToken.SignalChange()
 }
 
 // GetReloadToken gets a change token for observing configuration changes.
 func (p *ConfigurationProvider) GetReloadToken() IChangeToken {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return p.token
 }
 
 // SetData sets the provider's data (for derived classes).
 func (p *ConfigurationProvider) SetData(data map[string]string) {
 	p.mu.Lock()
+	oldToken := p.token
 	p.data = data
+	// Create a new token for future changes
+	p.token = NewChangeToken()
 	p.mu.Unlock()
+
+	// Signal the old token to notify listeners
+	oldToken.SignalChange()
 }
 
 // GetData gets the provider's data (for derived classes).

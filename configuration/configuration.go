@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 // IConfiguration represents a set of key/value application configuration properties.
@@ -91,40 +93,55 @@ type IConfigurationSection interface {
 
 // Configuration is the default implementation of IConfiguration.
 type Configuration struct {
-	data      map[string]string
-	callbacks []func()
-	providers []IConfigurationProvider
+	data        atomic.Value // stores map[string]string
+	callbacksMu sync.Mutex
+	callbacks   []func()
+	providers   []IConfigurationProvider
 }
 
 // NewConfiguration creates a new Configuration instance.
 func NewConfiguration() IConfiguration {
-	return &Configuration{
-		data:      make(map[string]string),
+	config := &Configuration{
 		callbacks: make([]func(), 0),
 		providers: make([]IConfigurationProvider, 0),
 	}
+	config.data.Store(make(map[string]string))
+	return config
 }
 
 // NewConfigurationRoot creates a new ConfigurationRoot instance.
 func NewConfigurationRoot(providers []IConfigurationProvider) IConfigurationRoot {
 	config := &Configuration{
-		data:      make(map[string]string),
 		callbacks: make([]func(), 0),
 		providers: providers,
 	}
+
 	// Load all providers
+	initialData := make(map[string]string)
 	for _, provider := range providers {
 		data := provider.Load()
 		for k, v := range data {
-			config.data[k] = v
+			initialData[k] = v
 		}
 	}
+	config.data.Store(initialData)
+
+	// Watch for provider changes
+	for _, provider := range providers {
+		OnChange(func() IChangeToken {
+			return provider.GetReloadToken()
+		}, func() {
+			config.Reload()
+		})
+	}
+
 	return config
 }
 
 // Get gets a configuration value by key.
 func (c *Configuration) Get(key string) string {
-	return c.data[key]
+	data := c.data.Load().(map[string]string)
+	return data[key]
 }
 
 // GetSection gets a configuration sub-section.
@@ -212,14 +229,16 @@ func (c *Configuration) GetFloat64(key string, defaultValue float64) float64 {
 
 // Exists checks if the configuration key exists.
 func (c *Configuration) Exists(key string) bool {
+	data := c.data.Load().(map[string]string)
+
 	// Check if exact key exists
-	if _, ok := c.data[key]; ok {
+	if _, ok := data[key]; ok {
 		return true
 	}
 
 	// Check if any key starts with this prefix (for sections)
 	prefix := key + ":"
-	for k := range c.data {
+	for k := range data {
 		if strings.HasPrefix(k, prefix) {
 			return true
 		}
@@ -360,16 +379,18 @@ func (c *Configuration) bindSlice(prefix string, v reflect.Value) {
 
 // bindSliceWithOptions binds configuration array to a slice field with options.
 func (c *Configuration) bindSliceWithOptions(prefix string, v reflect.Value, options *BinderOptions) {
+	data := c.data.Load().(map[string]string)
+
 	// Collect array elements
 	var items []string
 	for i := 0; ; i++ {
 		key := fmt.Sprintf("%s:%d", prefix, i)
-		if val := c.Get(key); val != "" {
+		if val := data[key]; val != "" {
 			items = append(items, val)
 		} else {
 			// Check if there are nested elements
 			hasNested := false
-			for k := range c.data {
+			for k := range data {
 				if strings.HasPrefix(k, key+":") {
 					hasNested = true
 					break
@@ -445,11 +466,13 @@ func (c *Configuration) bindMapWithOptions(prefix string, v reflect.Value, optio
 		return
 	}
 
+	data := c.data.Load().(map[string]string)
+
 	// Find all keys with prefix
 	prefixWithColon := prefix + ":"
 	seen := make(map[string]bool)
 
-	for k := range c.data {
+	for k := range data {
 		if !strings.HasPrefix(k, prefixWithColon) {
 			continue
 		}
@@ -465,27 +488,28 @@ func (c *Configuration) bindMapWithOptions(prefix string, v reflect.Value, optio
 
 		fullKey := prefix + ":" + mapKey
 		keyValue := reflect.ValueOf(mapKey)
+		val := data[fullKey]
 
 		switch elemType.Kind() {
 		case reflect.String:
-			if val := c.Get(fullKey); val != "" {
+			if val != "" {
 				v.SetMapIndex(keyValue, reflect.ValueOf(val))
 			}
 		case reflect.Int, reflect.Int64:
-			if val := c.Get(fullKey); val != "" {
+			if val != "" {
 				if intVal, err := strconv.ParseInt(val, 10, 64); err == nil {
 					v.SetMapIndex(keyValue, reflect.ValueOf(intVal).Convert(elemType))
 				}
 			}
 		case reflect.Bool:
-			if val := c.Get(fullKey); val != "" {
+			if val != "" {
 				if boolVal, err := strconv.ParseBool(val); err == nil {
 					v.SetMapIndex(keyValue, reflect.ValueOf(boolVal))
 				}
 			}
 		case reflect.Interface:
 			// For map[string]interface{}, store as string
-			if val := c.Get(fullKey); val != "" {
+			if val != "" {
 				v.SetMapIndex(keyValue, reflect.ValueOf(val))
 			}
 		}
@@ -494,15 +518,19 @@ func (c *Configuration) bindMapWithOptions(prefix string, v reflect.Value, optio
 
 // OnChange registers a callback for configuration changes.
 func (c *Configuration) OnChange(callback func()) {
+	c.callbacksMu.Lock()
+	defer c.callbacksMu.Unlock()
 	c.callbacks = append(c.callbacks, callback)
 }
 
 // GetChildren gets the immediate descendant configuration sub-sections.
 func (c *Configuration) GetChildren() []IConfigurationSection {
+	data := c.data.Load().(map[string]string)
+
 	children := make([]IConfigurationSection, 0)
 	seen := make(map[string]bool)
 
-	for key := range c.data {
+	for key := range data {
 		// Get first level key name
 		parts := strings.SplitN(key, ":", 2)
 		topKey := parts[0]
@@ -522,29 +550,47 @@ func (c *Configuration) GetChildren() []IConfigurationSection {
 
 // Set sets a configuration value.
 func (c *Configuration) Set(key string, value string) {
-	c.data[key] = value
-	c.notifyChange()
+	for {
+		old := c.data.Load().(map[string]string)
+		newData := make(map[string]string, len(old)+1)
+		for k, v := range old {
+			newData[k] = v
+		}
+		newData[key] = value
+		if c.data.CompareAndSwap(old, newData) {
+			c.notifyChange()
+			return
+		}
+	}
 }
 
 // notifyChange notifies all registered callbacks of a configuration change.
 func (c *Configuration) notifyChange() {
-	for _, callback := range c.callbacks {
+	c.callbacksMu.Lock()
+	callbacks := make([]func(), len(c.callbacks))
+	copy(callbacks, c.callbacks)
+	c.callbacksMu.Unlock()
+
+	for _, callback := range callbacks {
 		callback()
 	}
 }
 
 // Reload reloads the configuration from all providers.
 func (c *Configuration) Reload() {
-	// Clear existing data
-	c.data = make(map[string]string)
+	// Create new data map
+	newData := make(map[string]string)
 
 	// Reload all providers
 	for _, provider := range c.providers {
 		data := provider.Load()
 		for k, v := range data {
-			c.data[k] = v
+			newData[k] = v
 		}
 	}
+
+	// Atomically replace the data
+	c.data.Store(newData)
 
 	// Notify change callbacks
 	c.notifyChange()
@@ -552,6 +598,8 @@ func (c *Configuration) Reload() {
 
 // GetDebugView gets a debug view of the configuration.
 func (c *Configuration) GetDebugView() string {
+	data := c.data.Load().(map[string]string)
+
 	var sb strings.Builder
 	sb.WriteString("Configuration Debug View:\n")
 	sb.WriteString("========================\n\n")
@@ -564,11 +612,11 @@ func (c *Configuration) GetDebugView() string {
 		sb.WriteString("\n")
 	}
 
-	if len(c.data) > 0 {
-		sb.WriteString(fmt.Sprintf("Configuration Keys (%d):\n", len(c.data)))
+	if len(data) > 0 {
+		sb.WriteString(fmt.Sprintf("Configuration Keys (%d):\n", len(data)))
 		// Sort keys for consistent output
-		keys := make([]string, 0, len(c.data))
-		for k := range c.data {
+		keys := make([]string, 0, len(data))
+		for k := range data {
 			keys = append(keys, k)
 		}
 		// Simple bubble sort for keys
@@ -580,7 +628,7 @@ func (c *Configuration) GetDebugView() string {
 			}
 		}
 		for _, k := range keys {
-			sb.WriteString(fmt.Sprintf("  %s = %s\n", k, c.data[k]))
+			sb.WriteString(fmt.Sprintf("  %s = %s\n", k, data[k]))
 		}
 	} else {
 		sb.WriteString("No configuration keys loaded.\n")
@@ -705,11 +753,13 @@ func (s *ConfigurationSection) OnChange(callback func()) {
 
 // GetChildren gets the immediate descendant configuration sub-sections.
 func (s *ConfigurationSection) GetChildren() []IConfigurationSection {
+	data := s.config.data.Load().(map[string]string)
+
 	children := make([]IConfigurationSection, 0)
 	seen := make(map[string]bool)
 	prefix := s.path + ":"
 
-	for key := range s.config.data {
+	for key := range data {
 		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
