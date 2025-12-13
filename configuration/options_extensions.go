@@ -7,10 +7,10 @@ import (
 )
 
 // Configure registers configuration instance T with the DI container.
-// It binds the configuration to the specified section and registers IOptions[T], IOptionsMonitor[T], IOptionsSnapshot[T], and T itself.
+// It binds the configuration to the specified section and registers IOptionsMonitor[T] and T itself.
 // Corresponds to .NET services.Configure<T>(configuration.GetSection(...)).
 //
-// This function registers both the Options pattern (IOptions[T]) and direct injection (T),
+// This function registers both the Options pattern (IOptionsMonitor[T]) and direct injection (T),
 // allowing services to choose their preferred injection style.
 //
 // Usage:
@@ -20,27 +20,18 @@ import (
 //
 // Injection styles:
 //
-//	// Style 1: Standard .NET Options pattern
+//	// Style 1: Options pattern with hot reload support
 //	type Service1 struct {
-//	    config IOptions[AppSettings]
+//	    config IOptionsMonitor[AppSettings]
 //	}
 //
-//	// Style 2: Direct injection
+//	// Style 2: Direct injection (value snapshot)
 //	type Service2 struct {
 //	    config AppSettings
 //	}
 func Configure[T any](services di.IServiceCollection, section string) {
-	// Register IOptions[T] as singleton
-	services.AddSingleton(func(config IConfiguration) IOptions[T] {
-		var opts T
-		if err := config.Bind(section, &opts); err != nil {
-			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-		}
-		return NewOptions(&opts)
-	})
-
 	// Register IOptionsMonitor[T] as singleton (supports hot reload)
-	services.AddSingleton(func(config IConfiguration) IOptionsMonitor[T] {
+	services.Add(func(config IConfiguration) IOptionsMonitor[T] {
 		var opts T
 		if err := config.Bind(section, &opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -58,19 +49,9 @@ func Configure[T any](services di.IServiceCollection, section string) {
 		return monitor
 	})
 
-	// Register IOptionsSnapshot[T] as transient (new instance per request)
-	// TODO: di ServiceLifetime Scoped ?
-	services.AddTransient(func(config IConfiguration) IOptionsSnapshot[T] {
-		var opts T
-		if err := config.Bind(section, &opts); err != nil {
-			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-		}
-		return NewOptionsSnapshot(&opts)
-	})
-
-	// Register T directly for constructor injection
-	services.AddSingleton(func(opts IOptions[T]) T {
-		return *opts.Value()
+	// Register T directly for constructor injection (snapshot from IOptionsMonitor)
+	services.Add(func(monitor IOptionsMonitor[T]) T {
+		return *monitor.CurrentValue()
 	})
 }
 
@@ -87,17 +68,8 @@ func Configure[T any](services di.IServiceCollection, section string) {
 //	    }
 //	})
 func ConfigureWithDefaults[T any](services di.IServiceCollection, section string, defaults func() *T) {
-	// Register IOptions[T] as singleton
-	services.AddSingleton(func(config IConfiguration) IOptions[T] {
-		opts := defaults()
-		if err := config.Bind(section, opts); err != nil {
-			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-		}
-		return NewOptions(opts)
-	})
-
 	// Register IOptionsMonitor[T] as singleton (supports hot reload)
-	services.AddSingleton(func(config IConfiguration) IOptionsMonitor[T] {
+	services.Add(func(config IConfiguration) IOptionsMonitor[T] {
 		opts := defaults()
 		if err := config.Bind(section, opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -115,18 +87,9 @@ func ConfigureWithDefaults[T any](services di.IServiceCollection, section string
 		return monitor
 	})
 
-	// Register IOptionsSnapshot[T] as transient (new instance per request)
-	services.AddTransient(func(config IConfiguration) IOptionsSnapshot[T] {
-		opts := defaults()
-		if err := config.Bind(section, opts); err != nil {
-			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-		}
-		return NewOptionsSnapshot(opts)
-	})
-
-	// Register T directly for constructor injection
-	services.AddSingleton(func(opts IOptions[T]) T {
-		return *opts.Value()
+	// Register T directly for constructor injection (snapshot from IOptionsMonitor)
+	services.Add(func(monitor IOptionsMonitor[T]) T {
+		return *monitor.CurrentValue()
 	})
 }
 
@@ -143,20 +106,8 @@ func ConfigureWithDefaults[T any](services di.IServiceCollection, section string
 //	    return nil
 //	})
 func ConfigureWithValidation[T any](services di.IServiceCollection, section string, validator func(*T) error) {
-	// Register IOptions[T] as singleton
-	services.AddSingleton(func(config IConfiguration) IOptions[T] {
-		var opts T
-		if err := config.Bind(section, &opts); err != nil {
-			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-		}
-		if err := validator(&opts); err != nil {
-			panic(fmt.Sprintf("configuration validation failed for section %s: %v", section, err))
-		}
-		return NewOptions(&opts)
-	})
-
 	// Register IOptionsMonitor[T] as singleton (supports hot reload)
-	services.AddSingleton(func(config IConfiguration) IOptionsMonitor[T] {
+	services.Add(func(config IConfiguration) IOptionsMonitor[T] {
 		var opts T
 		if err := config.Bind(section, &opts); err != nil {
 			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
@@ -179,20 +130,8 @@ func ConfigureWithValidation[T any](services di.IServiceCollection, section stri
 		return monitor
 	})
 
-	// Register IOptionsSnapshot[T] as transient (new instance per request)
-	services.AddTransient(func(config IConfiguration) IOptionsSnapshot[T] {
-		var opts T
-		if err := config.Bind(section, &opts); err != nil {
-			panic(fmt.Sprintf("failed to bind configuration section %s: %v", section, err))
-		}
-		if err := validator(&opts); err != nil {
-			panic(fmt.Sprintf("configuration validation failed for section %s: %v", section, err))
-		}
-		return NewOptionsSnapshot(&opts)
-	})
-
-	// Register T directly for constructor injection
-	services.AddSingleton(func(opts IOptions[T]) T {
-		return *opts.Value()
+	// Register T directly for constructor injection (snapshot from IOptionsMonitor)
+	services.Add(func(monitor IOptionsMonitor[T]) T {
+		return *monitor.CurrentValue()
 	})
 }

@@ -17,6 +17,10 @@ type WebApplication struct {
 	routes      []*routing.RouteBuilder
 	groups      []*routing.RouteGroupBuilder
 	runtimeUrls *[]string // Pointer to runtime URLs (shared with HttpServer)
+
+	// Handler converter with services injection
+	toHandler  func(Handler) gin.HandlerFunc
+	toHandlers func(...Handler) []gin.HandlerFunc
 }
 
 // Run runs the web application and blocks until shutdown.
@@ -29,9 +33,9 @@ func (app *WebApplication) Run(urls ...string) error {
 	return app.host.Run()
 }
 
-// RunAsync runs the web application asynchronously.
-func (app *WebApplication) RunAsync(ctx context.Context) error {
-	return app.host.RunAsync(ctx)
+// RunWithContext runs the web application with a custom context and blocks until shutdown.
+func (app *WebApplication) RunWithContext(ctx context.Context) error {
+	return app.host.RunWithContext(ctx)
 }
 
 // Start starts the web application.
@@ -100,14 +104,14 @@ func (app *WebApplication) MapPatch(pattern string, handlers ...Handler) routing
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
 func (app *WebApplication) MapGroup(prefix string, handlers ...Handler) *routing.RouteGroupBuilder {
-	// Convert handlers for group middleware
-	ginHandlers := ToGinHandlers(handlers...)
+	// Convert handlers for group middleware using services-aware converter
+	ginHandlers := app.toHandlers(handlers...)
 
 	ginGroup := app.engine.Group(prefix, ginHandlers...)
 	group := routing.NewRouteGroupBuilder(ginGroup, prefix)
 
-	// Set handler converter so group routes can use custom handler types
-	group.SetHandlerConverter(ToGinHandler)
+	// Set handler converter with services injection
+	group.SetHandlerConverter(app.toHandler)
 
 	app.groups = append(app.groups, group)
 	return group
@@ -115,8 +119,8 @@ func (app *WebApplication) MapGroup(prefix string, handlers ...Handler) *routing
 
 // mapRoute is the internal method to register a route.
 func (app *WebApplication) mapRoute(method, pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
-	// Convert handlers to gin.HandlerFunc
-	ginHandlers := ToGinHandlers(handlers...)
+	// Convert handlers to gin.HandlerFunc using services-aware converter
+	ginHandlers := app.toHandlers(handlers...)
 
 	// Register with Gin
 	app.engine.Handle(method, pattern, ginHandlers...)

@@ -9,11 +9,11 @@ import (
 )
 
 // ServiceLifetime 服务生命周期
+// 简化版本只支持Singleton
 type ServiceLifetime int
 
 const (
 	Singleton ServiceLifetime = iota
-	Transient
 )
 
 // RegistrationKey 注册键
@@ -169,7 +169,7 @@ func (e *Engine) Compile() error {
 	return nil
 }
 
-// Resolve 解析服务
+// Resolve 解析服务（只支持Singleton）
 func (e *Engine) Resolve(serviceType reflect.Type, name string) (interface{}, error) {
 	if !e.compiled.Load() {
 		return nil, errors.New("engine not compiled")
@@ -177,20 +177,15 @@ func (e *Engine) Resolve(serviceType reflect.Type, name string) (interface{}, er
 
 	key := RegistrationKey{Type: serviceType, Name: name}
 
-	reg, exists := e.registrations[key]
+	_, exists := e.registrations[key]
 	if !exists {
 		return nil, fmt.Errorf("service %v not found", serviceType)
 	}
 
-	// Singleton 从缓存获取
-	if reg.Lifetime == Singleton {
-		singletons := e.singletons.Load().([]interface{})
-		id := e.registry.GetID(key.Type, key.Name)
-		return singletons[int(id)], nil
-	}
-
-	// Transient 每次创建
-	return e.createInstance(reg)
+	// All services are Singleton - retrieve from pre-compiled cache
+	singletons := e.singletons.Load().([]interface{})
+	id := e.registry.GetID(key.Type, key.Name)
+	return singletons[int(id)], nil
 }
 
 // ResolveAll 解析所有服务
@@ -293,4 +288,40 @@ func (e *Engine) GetRegistration(key RegistrationKey) (*Registration, bool) {
 
 	reg, exists := e.registrations[key]
 	return reg, exists
+}
+
+// GetSingletons 返回所有 Singleton 实例（用于资源清理）
+func (e *Engine) GetSingletons() []interface{} {
+	if !e.compiled.Load() {
+		return nil
+	}
+
+	singletons := e.singletons.Load()
+	if singletons == nil {
+		return nil
+	}
+
+	singletonsSlice := singletons.([]interface{})
+	result := make([]interface{}, 0, len(singletonsSlice))
+
+	for _, instance := range singletonsSlice {
+		if instance != nil {
+			result = append(result, instance)
+		}
+	}
+
+	return result
+}
+
+// GetAllRegistrations 返回所有注册信息
+func (e *Engine) GetAllRegistrations() map[RegistrationKey]*Registration {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// Return a copy to avoid external modifications
+	result := make(map[RegistrationKey]*Registration, len(e.registrations))
+	for k, v := range e.registrations {
+		result[k] = v
+	}
+	return result
 }

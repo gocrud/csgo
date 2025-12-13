@@ -8,42 +8,23 @@ import (
 )
 
 // IServiceCollection is a contract for a collection of service descriptors.
+// This is a pure registration interface following the Interface Segregation Principle.
+// Build, Count, and GetDescriptors methods are available on the concrete type but not in the interface.
 type IServiceCollection interface {
-	// AddSingleton registers a singleton service.
-	AddSingleton(constructor interface{}) IServiceCollection
+	// Add registers a singleton service using a constructor function.
+	Add(constructor interface{}) IServiceCollection
 
-	// AddTransient registers a transient service.
-	AddTransient(constructor interface{}) IServiceCollection
+	// AddInstance registers a singleton instance (pre-created object).
+	AddInstance(instance interface{}) IServiceCollection
 
-	// TryAddSingleton attempts to add a singleton service if it doesn't exist.
-	TryAddSingleton(constructor interface{}) IServiceCollection
+	// AddNamed registers a named singleton service.
+	AddNamed(name string, constructor interface{}) IServiceCollection
 
-	// TryAddTransient attempts to add a transient service if it doesn't exist.
-	TryAddTransient(constructor interface{}) IServiceCollection
-
-	// AddSingletonInstance registers a singleton instance.
-	AddSingletonInstance(instance interface{}) IServiceCollection
+	// TryAdd attempts to add a singleton service if it doesn't exist.
+	TryAdd(constructor interface{}) IServiceCollection
 
 	// AddHostedService registers a hosted service (background service).
-	// Corresponds to .NET IServiceCollection.AddHostedService<T>().
 	AddHostedService(constructor interface{}) IServiceCollection
-
-	// AddKeyedSingleton registers a keyed singleton service.
-	// Corresponds to .NET IServiceCollection.AddKeyedSingleton().
-	AddKeyedSingleton(serviceKey string, constructor interface{}) IServiceCollection
-
-	// AddKeyedTransient registers a keyed transient service.
-	// Corresponds to .NET IServiceCollection.AddKeyedTransient().
-	AddKeyedTransient(serviceKey string, constructor interface{}) IServiceCollection
-
-	// BuildServiceProvider builds the service provider.
-	BuildServiceProvider(options ...ServiceProviderOption) IServiceProvider
-
-	// Count returns the number of registered services.
-	Count() int
-
-	// GetDescriptors returns all service descriptors.
-	GetDescriptors() []ServiceDescriptor
 }
 
 // serviceCollection is the concrete implementation of IServiceCollection.
@@ -58,24 +39,29 @@ func NewServiceCollection() IServiceCollection {
 	}
 }
 
-// AddSingleton registers a singleton service.
-func (s *serviceCollection) AddSingleton(constructor interface{}) IServiceCollection {
+// BuildServiceProvider builds the service provider from a service collection.
+// This function allows building from the interface type.
+// Usage: provider := di.BuildServiceProvider(services)
+func BuildServiceProvider(services IServiceCollection) IServiceProvider {
+	// Type assert to concrete implementation
+	sc, ok := services.(*serviceCollection)
+	if !ok {
+		panic("services must be created by NewServiceCollection")
+	}
+
+	return sc.Build()
+}
+
+// Add registers a singleton service using a constructor function.
+func (s *serviceCollection) Add(constructor interface{}) IServiceCollection {
 	if err := s.register(constructor, Singleton); err != nil {
-		panic(fmt.Sprintf("failed to register singleton: %v", err))
+		panic(fmt.Sprintf("failed to register service: %v", err))
 	}
 	return s
 }
 
-// AddTransient registers a transient service.
-func (s *serviceCollection) AddTransient(constructor interface{}) IServiceCollection {
-	if err := s.register(constructor, Transient); err != nil {
-		panic(fmt.Sprintf("failed to register transient: %v", err))
-	}
-	return s
-}
-
-// TryAddSingleton attempts to add a singleton if it doesn't exist.
-func (s *serviceCollection) TryAddSingleton(constructor interface{}) IServiceCollection {
+// TryAdd attempts to add a singleton if it doesn't exist.
+func (s *serviceCollection) TryAdd(constructor interface{}) IServiceCollection {
 	ctorType := reflect.TypeOf(constructor)
 	if ctorType.Kind() != reflect.Func {
 		return s
@@ -86,44 +72,31 @@ func (s *serviceCollection) TryAddSingleton(constructor interface{}) IServiceCol
 
 	returnType := ctorType.Out(0)
 	if !s.engine.Contains(returnType, "") {
-		s.AddSingleton(constructor)
+		s.Add(constructor)
 	}
 	return s
 }
 
-// TryAddTransient attempts to add a transient if it doesn't exist.
-func (s *serviceCollection) TryAddTransient(constructor interface{}) IServiceCollection {
-	ctorType := reflect.TypeOf(constructor)
-	if ctorType.Kind() != reflect.Func {
-		return s
-	}
-	if ctorType.NumOut() == 0 {
-		return s
-	}
-
-	returnType := ctorType.Out(0)
-	if !s.engine.Contains(returnType, "") {
-		s.AddTransient(constructor)
-	}
-	return s
-}
-
-// AddSingletonInstance registers a singleton instance.
-func (s *serviceCollection) AddSingletonInstance(instance interface{}) IServiceCollection {
+// AddInstance registers a singleton instance (pre-created object).
+func (s *serviceCollection) AddInstance(instance interface{}) IServiceCollection {
 	if instance == nil {
 		panic("instance cannot be nil")
 	}
 
 	instanceType := reflect.TypeOf(instance)
-	constructor := func() interface{} {
-		return instance
-	}
+
+	// Create a properly typed constructor using reflection
+	// This ensures Register() correctly extracts the type
+	factoryType := reflect.FuncOf([]reflect.Type{}, []reflect.Type{instanceType}, false)
+	factoryValue := reflect.MakeFunc(factoryType, func(args []reflect.Value) []reflect.Value {
+		return []reflect.Value{reflect.ValueOf(instance)}
+	})
 
 	reg := &internal.Registration{
 		ServiceType:        instanceType,
 		ImplementationType: instanceType,
 		Lifetime:           internal.Singleton,
-		Factory:            constructor,
+		Factory:            factoryValue.Interface(),
 	}
 
 	if err := s.engine.Register(reg); err != nil {
@@ -137,32 +110,21 @@ func (s *serviceCollection) AddSingletonInstance(instance interface{}) IServiceC
 // The service will be started when the host starts and stopped when the host stops.
 func (s *serviceCollection) AddHostedService(constructor interface{}) IServiceCollection {
 	// Register as Singleton (hosted services should be singletons)
-	return s.AddSingleton(constructor)
+	return s.Add(constructor)
 }
 
-// AddKeyedSingleton registers a keyed singleton service.
-func (s *serviceCollection) AddKeyedSingleton(serviceKey string, constructor interface{}) IServiceCollection {
-	if err := s.registerKeyed(constructor, Singleton, serviceKey); err != nil {
-		panic(fmt.Sprintf("failed to register keyed singleton: %v", err))
+// AddNamed registers a named singleton service.
+func (s *serviceCollection) AddNamed(name string, constructor interface{}) IServiceCollection {
+	if err := s.registerKeyed(constructor, Singleton, name); err != nil {
+		panic(fmt.Sprintf("failed to register named service: %v", err))
 	}
 	return s
 }
 
-// AddKeyedTransient registers a keyed transient service.
-func (s *serviceCollection) AddKeyedTransient(serviceKey string, constructor interface{}) IServiceCollection {
-	if err := s.registerKeyed(constructor, Transient, serviceKey); err != nil {
-		panic(fmt.Sprintf("failed to register keyed transient: %v", err))
-	}
-	return s
-}
-
-// BuildServiceProvider builds the service provider.
-func (s *serviceCollection) BuildServiceProvider(options ...ServiceProviderOption) IServiceProvider {
-	opts := &ServiceProviderOptions{}
-	for _, opt := range options {
-		opt(opts)
-	}
-
+// Build builds the service provider.
+// This is a convenience method on the concrete type (not in the interface).
+// Usage: provider := services.Build()
+func (s *serviceCollection) Build() IServiceProvider {
 	provider := &serviceProvider{
 		engine: s.engine,
 	}
@@ -175,18 +137,32 @@ func (s *serviceCollection) BuildServiceProvider(options ...ServiceProviderOptio
 }
 
 // Count returns the number of registered services.
+// This is a diagnostic method on the concrete type (not in the interface).
 func (s *serviceCollection) Count() int {
-	// TODO: implement actual count
-	return 0
+	registrations := s.engine.GetAllRegistrations()
+	return len(registrations)
 }
 
 // GetDescriptors returns all service descriptors.
+// This is a diagnostic method on the concrete type (not in the interface).
 func (s *serviceCollection) GetDescriptors() []ServiceDescriptor {
-	// TODO: implement actual descriptor retrieval
-	return []ServiceDescriptor{}
+	registrations := s.engine.GetAllRegistrations()
+	descriptors := make([]ServiceDescriptor, 0, len(registrations))
+
+	for key, reg := range registrations {
+		descriptor := ServiceDescriptor{
+			ServiceType:        reg.ServiceType,
+			ImplementationType: reg.ImplementationType,
+			Lifetime:           Singleton, // All services are Singleton now
+			ServiceKey:         key.Name,
+		}
+		descriptors = append(descriptors, descriptor)
+	}
+
+	return descriptors
 }
 
-// register is a helper to register a service with a specific lifetime.
+// register is a helper to register a singleton service.
 func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLifetime) error {
 	if constructor == nil {
 		return fmt.Errorf("constructor cannot be nil")
@@ -210,27 +186,17 @@ func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLi
 
 	returnType := ctorType.Out(0)
 
-	var internalLifetime internal.ServiceLifetime
-	switch lifetime {
-	case Singleton:
-		internalLifetime = internal.Singleton
-	case Transient:
-		internalLifetime = internal.Transient
-	default:
-		internalLifetime = internal.Singleton
-	}
-
 	reg := &internal.Registration{
 		ServiceType:        returnType,
 		ImplementationType: returnType,
-		Lifetime:           internalLifetime,
+		Lifetime:           internal.Singleton,
 		Factory:            constructor,
 	}
 
 	return s.engine.Register(reg)
 }
 
-// registerKeyed is a helper to register a keyed service with a specific lifetime.
+// registerKeyed is a helper to register a keyed singleton service.
 func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime ServiceLifetime, serviceKey string) error {
 	if constructor == nil {
 		return fmt.Errorf("constructor cannot be nil")
@@ -258,38 +224,13 @@ func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime Serv
 
 	returnType := ctorType.Out(0)
 
-	var internalLifetime internal.ServiceLifetime
-	switch lifetime {
-	case Singleton:
-		internalLifetime = internal.Singleton
-	case Transient:
-		internalLifetime = internal.Transient
-	default:
-		internalLifetime = internal.Singleton
-	}
-
 	reg := &internal.Registration{
 		ServiceType:        returnType,
 		ImplementationType: returnType,
-		Lifetime:           internalLifetime,
+		Lifetime:           internal.Singleton,
 		Factory:            constructor,
 	}
 
 	// Register with the service key in the engine
 	return s.engine.RegisterKeyed(reg, serviceKey)
-}
-
-// ServiceProviderOptions contains options for building a service provider.
-type ServiceProviderOptions struct {
-	ValidateOnBuild bool
-}
-
-// ServiceProviderOption configures a ServiceProviderOptions.
-type ServiceProviderOption func(*ServiceProviderOptions)
-
-// WithValidateOnBuild validates all services can be resolved during build.
-func WithValidateOnBuild(validate bool) ServiceProviderOption {
-	return func(opts *ServiceProviderOptions) {
-		opts.ValidateOnBuild = validate
-	}
 }

@@ -11,33 +11,20 @@ import (
 
 // IServiceProvider defines the mechanism for retrieving service objects.
 type IServiceProvider interface {
-	// GetService attempts to retrieve a service and populate it into the target pointer.
-	// Example: var svc IUserService; err := provider.GetService(&svc)
-	GetService(target interface{}) error
+	// Get retrieves a service and populates it into the target pointer (panics if not found).
+	// Supports both pointer and value types with automatic dereferencing:
+	//   - var svc *UserService; provider.Get(&svc)  // pointer type (zero-copy)
+	//   - var svc UserService; provider.Get(&svc)   // value type (auto-deref + copy)
+	Get(target interface{})
 
-	// GetRequiredService retrieves a service and populates it into the target pointer.
-	// Panics if the service cannot be resolved.
-	// Example: var svc IUserService; provider.GetRequiredService(&svc)
-	GetRequiredService(target interface{})
+	// GetNamed retrieves a named service and populates it into the target pointer (panics if not found).
+	//   - var db *Database; provider.GetNamed(&db, "primary")
+	GetNamed(target interface{}, serviceKey string)
 
-	// TryGetService attempts to retrieve a service, returns false if not found.
-	// Example: var svc IUserService; if provider.TryGetService(&svc) { ... }
-	TryGetService(target interface{}) bool
-
-	// GetServices retrieves all services of the specified type.
-	// Example: var services []IHostedService; provider.GetServices(&services)
-	GetServices(target interface{}) error
-
-	// GetKeyedService retrieves a named service.
-	// Example: var svc IUserService; provider.GetKeyedService(&svc, "primary")
-	GetKeyedService(target interface{}, serviceKey string) error
-
-	// GetRequiredKeyedService retrieves a required named service.
-	// Example: var svc IUserService; provider.GetRequiredKeyedService(&svc, "primary")
-	GetRequiredKeyedService(target interface{}, serviceKey string)
-
-	// IsService checks if a service is registered.
-	IsService(serviceType reflect.Type) bool
+	// Internal methods (used by generic API functions)
+	resolveType(t reflect.Type) (interface{}, error)
+	resolveNamed(t reflect.Type, name string) (interface{}, error)
+	resolveAll(t reflect.Type) []interface{}
 
 	// Dispose releases all resources.
 	Dispose() error
@@ -49,159 +36,124 @@ type serviceProvider struct {
 	disposed atomic.Bool
 }
 
-// GetService retrieves a service and populates it into the target pointer.
-func (p *serviceProvider) GetService(target interface{}) error {
+// Get retrieves a service and populates it into the target pointer.
+// Supports both pointer and value types with intelligent dereferencing.
+func (p *serviceProvider) Get(target interface{}) {
 	if p.disposed.Load() {
-		return errors.New("service provider is disposed")
-	}
-
-	// Validate target is a pointer
-	val := reflect.ValueOf(target)
-	if val.Kind() != reflect.Ptr {
-		return errors.New("target must be a pointer")
-	}
-
-	if val.IsNil() {
-		return errors.New("target pointer cannot be nil")
-	}
-
-	// Get target element type
-	elem := val.Elem()
-	elemType := elem.Type()
-
-	// Validate type can be set
-	if !elem.CanSet() {
-		return fmt.Errorf("target of type %v cannot be set", elemType)
-	}
-
-	// Resolve service from engine
-	service, err := p.engine.Resolve(elemType, "")
-	if err != nil {
-		return fmt.Errorf("failed to resolve service %v: %w", elemType, err)
-	}
-
-	if service == nil {
-		return fmt.Errorf("service of type %v is not registered", elemType)
-	}
-
-	// Validate type compatibility
-	serviceVal := reflect.ValueOf(service)
-	if !serviceVal.Type().AssignableTo(elemType) {
-		return fmt.Errorf("service type %v is not assignable to target type %v",
-			serviceVal.Type(), elemType)
-	}
-
-	// Set value
-	elem.Set(serviceVal)
-	return nil
-}
-
-// GetRequiredService retrieves a required service.
-func (p *serviceProvider) GetRequiredService(target interface{}) {
-	if err := p.GetService(target); err != nil {
-		panic(fmt.Sprintf("Failed to resolve required service: %v", err))
-	}
-}
-
-// TryGetService attempts to retrieve a service.
-func (p *serviceProvider) TryGetService(target interface{}) bool {
-	err := p.GetService(target)
-	return err == nil
-}
-
-// GetServices retrieves all services of the specified type.
-func (p *serviceProvider) GetServices(target interface{}) error {
-	if p.disposed.Load() {
-		return errors.New("service provider is disposed")
-	}
-
-	// Validate target is a pointer to slice
-	val := reflect.ValueOf(target)
-	if val.Kind() != reflect.Ptr {
-		return errors.New("target must be a pointer to slice")
-	}
-
-	if val.IsNil() {
-		return errors.New("target pointer cannot be nil")
-	}
-
-	elem := val.Elem()
-	if elem.Kind() != reflect.Slice {
-		return errors.New("target must be a pointer to slice")
-	}
-
-	// Get slice element type
-	elemType := elem.Type().Elem()
-
-	// Resolve all services from engine
-	services, err := p.engine.ResolveAll(elemType)
-	if err != nil {
-		return fmt.Errorf("failed to resolve services %v: %w", elemType, err)
-	}
-
-	// Create slice
-	slice := reflect.MakeSlice(elem.Type(), len(services), len(services))
-	for i, service := range services {
-		slice.Index(i).Set(reflect.ValueOf(service))
-	}
-
-	// Set value
-	elem.Set(slice)
-	return nil
-}
-
-// GetKeyedService retrieves a named service.
-func (p *serviceProvider) GetKeyedService(target interface{}, serviceKey string) error {
-	if p.disposed.Load() {
-		return errors.New("service provider is disposed")
+		panic("service provider is disposed")
 	}
 
 	val := reflect.ValueOf(target)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
-		return errors.New("target must be a non-nil pointer")
+		panic("target must be a non-nil pointer")
 	}
 
 	elem := val.Elem()
 	elemType := elem.Type()
 
-	if !elem.CanSet() {
-		return fmt.Errorf("target of type %v cannot be set", elemType)
+	// Try 1: Direct lookup for the target type
+	service, err := p.engine.Resolve(elemType, "")
+	if err == nil {
+		elem.Set(reflect.ValueOf(service))
+		return
 	}
 
-	// Resolve named service from engine
+	// Try 2: If target is a value type (struct), try to find pointer type and auto-deref
+	if elemType.Kind() == reflect.Struct {
+		ptrType := reflect.PointerTo(elemType)
+		ptrService, ptrErr := p.engine.Resolve(ptrType, "")
+		if ptrErr == nil {
+			// Auto-dereference: assign copy of the value
+			elem.Set(reflect.ValueOf(ptrService).Elem())
+			return
+		}
+	}
+
+	panic(fmt.Sprintf("service %v not found", elemType))
+}
+
+// GetNamed retrieves a named service and populates it into the target pointer.
+func (p *serviceProvider) GetNamed(target interface{}, serviceKey string) {
+	if p.disposed.Load() {
+		panic("service provider is disposed")
+	}
+
+	val := reflect.ValueOf(target)
+	if val.Kind() != reflect.Ptr || val.IsNil() {
+		panic("target must be a non-nil pointer")
+	}
+
+	elem := val.Elem()
+	elemType := elem.Type()
+
+	// Try 1: Direct lookup
 	service, err := p.engine.Resolve(elemType, serviceKey)
-	if err != nil {
-		return fmt.Errorf("failed to resolve keyed service %v[%s]: %w",
-			elemType, serviceKey, err)
+	if err == nil {
+		elem.Set(reflect.ValueOf(service))
+		return
 	}
 
-	if service == nil {
-		return fmt.Errorf("keyed service %v[%s] is not registered",
-			elemType, serviceKey)
+	// Try 2: Auto-deref for value types
+	if elemType.Kind() == reflect.Struct {
+		ptrType := reflect.PointerTo(elemType)
+		ptrService, ptrErr := p.engine.Resolve(ptrType, serviceKey)
+		if ptrErr == nil {
+			elem.Set(reflect.ValueOf(ptrService).Elem())
+			return
+		}
 	}
 
-	elem.Set(reflect.ValueOf(service))
-	return nil
+	panic(fmt.Sprintf("named service %v[%s] not found", elemType, serviceKey))
 }
 
-// GetRequiredKeyedService retrieves a required named service.
-func (p *serviceProvider) GetRequiredKeyedService(target interface{}, serviceKey string) {
-	if err := p.GetKeyedService(target, serviceKey); err != nil {
-		panic(fmt.Sprintf("Failed to resolve required keyed service: %v", err))
+// resolveType resolves a service by type (internal method for generic API).
+func (p *serviceProvider) resolveType(t reflect.Type) (interface{}, error) {
+	if p.disposed.Load() {
+		return nil, errors.New("provider disposed")
 	}
+	return p.engine.Resolve(t, "")
 }
 
-// IsService checks if a service is registered.
-func (p *serviceProvider) IsService(serviceType reflect.Type) bool {
-	return p.engine.Contains(serviceType, "")
+// resolveNamed resolves a named service by type (internal method for generic API).
+func (p *serviceProvider) resolveNamed(t reflect.Type, name string) (interface{}, error) {
+	if p.disposed.Load() {
+		return nil, errors.New("provider disposed")
+	}
+	return p.engine.Resolve(t, name)
 }
 
-// Dispose releases all resources.
+// resolveAll resolves all services of a type (internal method for generic API).
+func (p *serviceProvider) resolveAll(t reflect.Type) []interface{} {
+	if p.disposed.Load() {
+		return nil
+	}
+	services, _ := p.engine.ResolveAll(t)
+	return services
+}
+
+// Dispose releases all resources including singleton services.
+// All singleton services implementing IDisposable will have their Dispose method called.
 func (p *serviceProvider) Dispose() error {
 	if !p.disposed.CompareAndSwap(false, true) {
 		return nil // Already disposed
 	}
 
-	// TODO: Dispose all disposable singletons
+	// Dispose all singleton services implementing IDisposable
+	singletons := p.engine.GetSingletons()
+	var errors []error
+
+	// Dispose in reverse order (LIFO)
+	for i := len(singletons) - 1; i >= 0; i-- {
+		if disposable, ok := singletons[i].(IDisposable); ok {
+			if err := disposable.Dispose(); err != nil {
+				errors = append(errors, fmt.Errorf("failed to dispose singleton at index %d: %w", i, err))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("provider disposal encountered %d error(s): %v", len(errors), errors)
+	}
+
 	return nil
 }

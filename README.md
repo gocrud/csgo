@@ -1,20 +1,27 @@
-# CSGO Framework
+# CSGO - C# 风格的 Go Web 框架
 
-一个受 ASP.NET Core 启发的 Go Web 框架，提供完整的依赖注入、控制器模式和现代化开发体验。
-
+<div align="center">
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D%201.18-blue)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen)](docs/)
 
-## ✨ 核心特性
+**CSGO** 是一个受 .NET/ASP.NET Core 启发的现代化 Go Web 框架，提供优雅的 API 和完整的企业级特性。
 
-- 🎯 **完整的依赖注入** - 类似 .NET 的服务注册（`AddSingleton`、`AddTransient`），Go 风格的指针填充解析
-- 🌐 **现代 Web 框架** - 基于 Gin，提供控制器模式、路由系统和中间件支持
-- 🎭 **HttpContext & ActionResult** - 类似 .NET 的请求处理模式，统一响应格式（`Ok`、`NotFound`、`BadRequest`）
-- 📦 **模块化设计** - 业务模块扩展方法，清晰的代码组织和依赖管理
-- 📖 **Swagger 集成** - 自动 API 文档生成，支持 OpenAPI 3.0
-- ⚙️ **配置管理** - 多源配置系统（JSON、环境变量、命令行）
-- 🚀 **应用托管** - Host Builder 模式，完整的应用生命周期管理
-- 🔧 **开发体验** - 类型安全、IDE 友好、简洁的 API 设计
+## ✨ 特性
+
+- 🚀 **简洁优雅** - 受 ASP.NET Core 启发的 API 设计，上手即用
+- 💉 **依赖注入** - 内置强大的 DI 容器，支持自动依赖解析
+- 🎯 **类型安全** - 充分利用 Go 泛型，提供类型安全的 API
+- 📝 **请求验证** - FluentValidation 风格的验证系统
+- 🔧 **配置管理** - 灵活的配置系统，支持多种配置源
+- 📊 **日志系统** - 结构化日志，支持多种输出格式
+- 🛠️ **中间件** - 强大的中间件管道，灵活扩展请求处理流程
+- 🎮 **控制器** - 可选的控制器模式，更好地组织代码
+- 🔒 **错误处理** - 统一的错误处理和业务错误管理
+- 🌐 **CORS 支持** - 开箱即用的跨域资源共享
+- 📚 **API 文档** - 集成 Swagger/OpenAPI 支持
+- 🔄 **后台服务** - 托管服务支持，轻松实现后台任务
+- ⚡ **高性能** - 基于 Gin 框架，性能出色
 
 ## 🚀 快速开始
 
@@ -24,44 +31,27 @@
 go get github.com/gocrud/csgo
 ```
 
-### 第一个应用
+### Hello World
 
 ```go
 package main
 
-import (
-    "github.com/gocrud/csgo/di"
-    "github.com/gocrud/csgo/web"
-)
+import "github.com/gocrud/csgo/web"
 
 func main() {
     // 创建应用构建器
     builder := web.CreateBuilder()
     
-    // 注册服务
-    builder.Services.AddSingleton(NewUserService)
-    
     // 构建应用
     app := builder.Build()
     
-    // 使用 HttpContext + ActionResult（推荐）
-    app.MapGet("/hello", func(c *web.HttpContext) web.IActionResult {
-        userService := di.GetRequiredService[*UserService](app.Services)
-        return c.Ok(gin.H{"message": userService.GetGreeting()})
+    // 定义路由
+    app.MapGet("/", func(c *web.HttpContext) web.IActionResult {
+        return c.Ok(web.M{"message": "Hello, CSGO!"})
     })
     
     // 运行应用
-    app.Run()
-}
-
-type UserService struct{}
-
-func NewUserService() *UserService {
-    return &UserService{}
-}
-
-func (s *UserService) GetGreeting() string {
-    return "Hello from CSGO!"
+    app.Run()  // 默认监听 :8080
 }
 ```
 
@@ -71,69 +61,250 @@ func (s *UserService) GetGreeting() string {
 go run main.go
 ```
 
-访问 http://localhost:8080/hello，你会看到：
+访问 http://localhost:8080/ 查看结果。
 
-```json
-{"message": "Hello from CSGO!"}
-```
-
-## 📚 核心概念
-
-### 依赖注入
-
-CSGO 提供了完整的 DI 容器，支持两种服务生命周期：
+### 完整示例
 
 ```go
-// Singleton - 全局唯一实例（推荐用于无状态服务）
-services.AddSingleton(NewDatabaseConnection)
-services.AddSingleton(NewUserService)
+package main
 
-// Transient - 每次请求都创建新实例（用于有状态服务）
-services.AddTransient(NewEmailService)
-services.AddTransient(NewRequestLogger)
+import (
+    "github.com/gocrud/csgo/di"
+    "github.com/gocrud/csgo/web"
+)
 
-// 服务解析（指针填充方式）
-var db *DatabaseConnection
-provider.GetRequiredService(&db)
+// 定义服务
+type UserService struct{}
 
-// 或使用泛型辅助方法（推荐）
-db := di.GetRequiredService[*DatabaseConnection](provider)
+func NewUserService() *UserService {
+    return &UserService{}
+}
+
+func (s *UserService) GetUser(id int) string {
+    return fmt.Sprintf("User %d", id)
+}
+
+// 定义请求模型
+type CreateUserRequest struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func main() {
+    builder := web.CreateBuilder()
+    
+    // 注册服务
+    builder.Services.Add(NewUserService)
+    
+    app := builder.Build()
+    
+    // 获取用户
+    app.MapGet("/users/:id", func(c *web.HttpContext) web.IActionResult {
+        userService := di.Get[*UserService](c.Services)
+        id := c.Params().PathInt("id").Value()
+        user := userService.GetUser(id)
+        return c.Ok(web.M{"user": user})
+    })
+    
+    // 创建用户
+    app.MapPost("/users", func(c *web.HttpContext) web.IActionResult {
+        var req CreateUserRequest
+        if err := c.MustBindJSON(&req); err != nil {
+            return err
+        }
+        return c.Created(web.M{"message": "User created", "name": req.Name})
+    })
+    
+    app.Run()
+}
 ```
 
-**注意：** 框架采用简化设计，不支持 Scoped 生命周期。Controllers 是单例的，必须保持无状态。
+## 📚 文档
 
-📖 [查看完整 DI 指南](docs/guides/dependency-injection.md) | [框架变更说明](docs/FRAMEWORK_CHANGES.md)
+完整文档请查看 [docs](docs/) 目录：
 
-### Web 应用
+### 🎓 入门教程
 
-基于 Gin 构建，提供控制器模式和路由系统：
+- **[快速入门](docs/00-getting-started/)** - 30 分钟上手 CSGO
+  - [安装配置](docs/00-getting-started/installation.md)
+  - [第一个应用](docs/00-getting-started/hello-world.md)
+  - [核心概念](docs/00-getting-started/concepts.md)
+
+### 📖 核心基础
+
+- **[基础知识](docs/01-fundamentals/)** - 深入理解核心概念
+  - [Web 应用基础](docs/01-fundamentals/web-basics.md)
+  - [路由系统](docs/01-fundamentals/routing.md)
+  - [依赖注入](docs/01-fundamentals/dependency-injection.md)
+  - [配置管理](docs/01-fundamentals/configuration.md)
+  - [HttpContext](docs/01-fundamentals/http-context.md)
+
+### 🔨 构建 API
+
+- **[API 开发](docs/02-building-apis/)** - 构建生产级 API
+  - [控制器模式](docs/02-building-apis/controllers.md)
+  - [请求验证](docs/02-building-apis/validation.md)
+  - [错误处理](docs/02-building-apis/error-handling.md)
+  - [API 文档](docs/02-building-apis/api-docs.md)
+  - [最佳实践](docs/02-building-apis/best-practices.md)
+
+### 🚀 高级特性
+
+- **[进阶主题](docs/03-advanced-features/)** - 掌握高级功能
+  - [中间件](docs/03-advanced-features/middleware.md)
+  - [后台服务](docs/03-advanced-features/background-services.md)
+  - [日志系统](docs/03-advanced-features/logging.md)
+  - [性能优化](docs/03-advanced-features/performance.md)
+  - [单元测试](docs/03-advanced-features/testing.md)
+
+### 🔧 模块文档
+
+- **[Web 框架](web/README.md)** - Web 应用开发
+- **[依赖注入 (DI)](di/README.md)** - 服务容器和依赖注入
+- **[配置系统](configuration/README.md)** - 配置管理
+- **[验证系统](validation/README.md)** - FluentValidation 风格的验证
+- **[日志系统](logging/README.md)** - 结构化日志
+- **[错误处理](errors/README.md)** - 业务错误和错误码
+- **[主机托管](hosting/README.md)** - 应用生命周期和后台服务
+- **[Swagger](swagger/README.md)** - API 文档生成
+
+## 🏗️ 项目结构
+
+推荐的项目结构：
+
+```
+myapp/
+├── main.go                 # 应用入口
+├── appsettings.json        # 配置文件
+├── appsettings.Development.json
+├── go.mod
+├── go.sum
+├── controllers/            # 控制器
+│   ├── user_controller.go
+│   └── product_controller.go
+├── services/              # 业务服务
+│   ├── user_service.go
+│   └── product_service.go
+├── models/                # 数据模型
+│   ├── user.go
+│   └── product.go
+├── repositories/          # 数据访问层
+│   ├── user_repository.go
+│   └── product_repository.go
+└── validators/            # 验证器
+    ├── user_validator.go
+    └── product_validator.go
+```
+
+## 🌟 核心概念
+
+### WebApplicationBuilder
+
+`WebApplicationBuilder` 是应用程序的构建器，负责配置和初始化：
 
 ```go
 builder := web.CreateBuilder()
 
-// 添加 CORS
-builder.AddCors(func(opts *CorsOptions) {
-    opts.AllowOrigins = []string{"http://localhost:3000"}
-})
+// 配置服务
+builder.Services.Add(NewUserService)
 
+// 访问配置
+port := builder.Configuration.GetInt("server:port", 8080)
+
+// 访问环境
+if builder.Environment.IsDevelopment() {
+    // 开发环境特定配置
+}
+
+// 构建应用
 app := builder.Build()
-
-// 使用中间件
-app.UseCors()
-
-// 定义路由组
-api := app.MapGroup("/api")
-api.MapGet("/users", GetUsers)
-api.MapPost("/users", CreateUser)
-
-app.Run()
 ```
 
-[查看 Web 应用指南 →](docs/guides/web-applications.md)
+### 依赖注入
+
+内置的 DI 容器支持自动依赖解析：
+
+```go
+// 注册服务
+builder.Services.Add(NewDatabase)
+builder.Services.Add(NewUserRepository)  // 自动注入 Database
+builder.Services.Add(NewUserService)     // 自动注入 UserRepository
+
+// 使用服务
+app.MapGet("/users", func(c *web.HttpContext) web.IActionResult {
+    userService := di.Get[*UserService](c.Services)
+    users := userService.GetAll()
+    return c.Ok(users)
+})
+```
+
+### HttpContext 和 ActionResult
+
+统一的请求处理和响应格式：
+
+```go
+func handler(c *web.HttpContext) web.IActionResult {
+    // 访问请求
+    id := c.RawCtx().Param("id")
+    
+    // 绑定 JSON
+    var req Request
+    if err := c.MustBindJSON(&req); err != nil {
+        return err  // 自动返回 400 错误
+    }
+    
+    // 访问服务
+    service := di.Get[*Service](c.Services)
+    
+    // 返回响应
+    return c.Ok(data)           // 200 OK
+    return c.Created(data)      // 201 Created
+    return c.NoContent()        // 204 No Content
+    return c.BadRequest("...")  // 400 Bad Request
+    return c.NotFound("...")    // 404 Not Found
+}
+```
+
+### 请求验证
+
+FluentValidation 风格的验证系统：
+
+```go
+// 定义验证器
+func NewCreateUserValidator() *validation.AbstractValidator[CreateUserRequest] {
+    v := validation.NewValidator[CreateUserRequest]()
+    
+    v.Field(func(r *CreateUserRequest) string { return r.Name }).
+        NotEmpty().
+        MinLength(2).
+        MaxLength(50)
+    
+    v.Field(func(r *CreateUserRequest) string { return r.Email }).
+        NotEmpty().
+        EmailAddress()
+    
+    return v
+}
+
+// 注册验证器
+func init() {
+    validation.RegisterValidator[CreateUserRequest](NewCreateUserValidator())
+}
+
+// 使用验证
+func createUser(c *web.HttpContext) web.IActionResult {
+    req, err := web.BindAndValidate[CreateUserRequest](c)
+    if err != nil {
+        return err  // 自动返回验证错误
+    }
+    // 验证通过，处理业务逻辑
+    return c.Created(user)
+}
+```
 
 ### 控制器模式
 
-类似 ASP.NET Core MVC 的控制器，支持 ActionResult：
+可选的控制器模式，更好地组织代码：
 
 ```go
 type UserController struct {
@@ -144,158 +315,139 @@ func NewUserController(userService *UserService) *UserController {
     return &UserController{userService: userService}
 }
 
-// 使用 IController 接口
 func (ctrl *UserController) MapRoutes(app *web.WebApplication) {
     users := app.MapGroup("/api/users")
-    users.MapGet("/:id", ctrl.GetByID)
+    users.MapGet("", ctrl.List)
+    users.MapGet("/:id", ctrl.Get)
     users.MapPost("", ctrl.Create)
+    users.MapPut("/:id", ctrl.Update)
+    users.MapDelete("/:id", ctrl.Delete)
 }
 
-// 使用 HttpContext + ActionResult
-func (ctrl *UserController) GetByID(c *web.HttpContext) web.IActionResult {
-    id, err := c.MustPathInt("id")
-    if err != nil {
-        return err  // 自动返回 400 Bad Request
-    }
-    
-    user := ctrl.userService.GetUserByID(id)
-    if user == nil {
-        return c.NotFound("用户不存在")
-    }
-    
-    return c.Ok(user)
-}
-
-func (ctrl *UserController) Create(c *web.HttpContext) web.IActionResult {
-    var req CreateUserRequest
-    if err := c.MustBindJSON(&req); err != nil {
-        return err
-    }
-    
-    user := ctrl.userService.Create(req)
-    return c.Created(user)
+func (ctrl *UserController) List(c *web.HttpContext) web.IActionResult {
+    users := ctrl.userService.GetAll()
+    return c.Ok(users)
 }
 
 // 注册控制器
-web.AddController(builder.Services, func(sp di.IServiceProvider) *UserController {
-    return NewUserController(di.GetRequiredService[*UserService](sp))
-})
-
-app := builder.Build()
-app.MapControllers()  // 自动映射所有控制器
+web.AddController(builder.Services, NewUserController)
+app.MapControllers()
 ```
 
-[查看控制器指南 →](docs/guides/controllers.md)
+### 后台服务
 
-### 业务模块
-
-创建可复用的业务模块扩展：
+轻松实现后台任务：
 
 ```go
-// 模块定义
-package users
-
-// AddUserServices 注册用户模块的所有服务
-func AddUserServices(services di.IServiceCollection) {
-    services.AddTransient(NewUserService)
-    services.AddTransient(NewUserRepository)
-    services.AddSingleton(NewUserCache)
+type EmailWorker struct {
+    *hosting.BackgroundService
+    emailService *EmailService
 }
 
-// 在主程序中使用
-builder := web.CreateBuilder()
-users.AddUserServices(builder.Services)
-orders.AddOrderServices(builder.Services)
+func NewEmailWorker(emailService *EmailService) *EmailWorker {
+    worker := &EmailWorker{
+        BackgroundService: hosting.NewBackgroundService(),
+        emailService:      emailService,
+    }
+    worker.SetExecuteFunc(worker.execute)
+    return worker
+}
+
+func (w *EmailWorker) execute(ctx context.Context) error {
+    ticker := time.NewTicker(10 * time.Second)
+    defer ticker.Stop()
+    
+    for {
+        select {
+        case <-ticker.C:
+            w.emailService.ProcessQueue()
+        case <-w.StoppingToken():
+            return nil
+        case <-ctx.Done():
+            return ctx.Err()
+        }
+    }
+}
+
+// 注册后台服务
+builder.Services.AddHostedService(NewEmailWorker)
 ```
 
-[查看业务模块指南 →](docs/guides/business-modules.md)
+## 🎯 设计原则
 
-### API 文档
+CSGO 遵循以下设计原则：
 
-自动生成 Swagger 文档：
+1. **约定优于配置** - 提供合理的默认值，减少配置工作
+2. **类型安全** - 使用 Go 泛型提供类型安全的 API
+3. **依赖注入** - 松耦合、可测试的代码
+4. **清晰的职责分离** - Controller → Service → Repository
+5. **统一的错误处理** - 一致的错误响应格式
+6. **开发者体验** - 简洁、直观、易于使用的 API
 
-```go
-import "github.com/gocrud/csgo/swagger"
+## 🤝 与 .NET 的对比
 
-// 添加 Swagger
-swagger.AddSwaggerGen(builder.Services, func(opts *swagger.SwaggerGenOptions) {
-    opts.Title = "My API"
-    opts.Version = "v1"
-    opts.Description = "API Documentation"
-})
+| 功能 | .NET/ASP.NET Core | CSGO |
+|------|-------------------|------|
+| 应用构建器 | `WebApplication.CreateBuilder()` | `web.CreateBuilder()` |
+| 依赖注入 | `services.AddSingleton<T>()` | `services.Add(NewT)` |
+| 路由 | `app.MapGet("/api/users", ...)` | `app.MapGet("/api/users", ...)` |
+| 控制器 | `[ApiController]` | `web.AddController()` |
+| 请求验证 | `FluentValidation` | `validation.NewValidator[T]()` |
+| 后台服务 | `IHostedService` | `hosting.IHostedService` |
+| 配置 | `IConfiguration` | `configuration.IConfiguration` |
+| 日志 | `ILogger<T>` | `logging.ILogger` |
 
-app := builder.Build()
+## 📦 依赖
 
-// 启用 Swagger UI
-swagger.UseSwagger(app)
-swagger.UseSwaggerUI(app)
+CSGO 基于以下优秀的开源项目：
 
-// 访问 http://localhost:8080/swagger
-```
+- [Gin](https://github.com/gin-gonic/gin) - 高性能的 HTTP Web 框架
+- [Zerolog](https://github.com/rs/zerolog) - 零分配的 JSON 日志库
 
-[查看 API 文档指南 →](docs/guides/api-documentation.md)
+## 🗺️ 路线图
 
-## 📖 完整文档
-
-### 快速入门
-- [快速开始](docs/getting-started.md) - 安装和第一个应用
-- **[快速参考](docs/QUICK_REFERENCE.md)** - 一页纸速查手册 📄
-- **[框架变更说明](docs/FRAMEWORK_CHANGES.md)** - 设计决策和最佳实践 🔄
-
-### 用户指南
-- [Web 应用](docs/guides/web-applications.md) - Web 应用完整指南
-- [控制器](docs/guides/controllers.md) - 控制器模式
-- [依赖注入](docs/guides/dependency-injection.md) - DI 系统
-- [配置管理](docs/guides/configuration.md) - 配置系统
-- [应用托管](docs/guides/hosting.md) - 生命周期管理
-- [业务模块](docs/guides/business-modules.md) - 模块化设计
-- [API 文档](docs/guides/api-documentation.md) - Swagger 集成
-
-### 参考资料
-- [API 参考](docs/api/) - 完整的 API 文档
-- [最佳实践](docs/best-practices.md) - 推荐的代码组织和模式
-- [与 .NET 对比](docs/comparison-with-dotnet.md) - API 对照和迁移指南
-
-## 💡 示例
-
-查看 [examples/](examples/) 目录获取完整的示例代码：
-
-- [complete_di_demo](examples/complete_di_demo/) - DI 功能完整演示
-- [business_module_demo](examples/business_module_demo/) - 业务模块设计示例
-- [controller_api_demo](examples/controller_api_demo/) - 控制器模式示例
-- [service_resolution_demo](examples/service_resolution_demo/) - 服务解析示例
-
-## 🔄 与 .NET 的关系
-
-CSGO 深受 ASP.NET Core 启发，但针对 Go 语言特性进行了优化：
-
-| .NET | CSGO | 说明 |
-|------|-----|------|
-| `IServiceCollection` | `di.IServiceCollection` | 服务注册接口 |
-| `AddSingleton<T>()` | `AddSingleton(factory)` | 注册单例服务 |
-| `GetService<T>()` | `GetService(&target)` | 指针填充方式解析 |
-| `WebApplicationBuilder` | `web.CreateBuilder()` | Web 应用构建器 |
-| `app.MapGet()` | `app.MapGet()` | 路由定义 |
-| `HttpContext` | `web.HttpContext` | HTTP 上下文 |
-| `IActionResult` | `web.IActionResult` | 操作结果接口 |
-| `Ok()` / `NotFound()` | `c.Ok()` / `c.NotFound()` | 响应辅助方法 |
-| `IHostedService` | `IHostedService` | 后台服务 |
-
-**关键差异**：
-- **服务解析**：CSGO 使用 Go 惯用的指针填充方式（类似 `json.Unmarshal`），而不是泛型返回
-- **类型安全**：编译时类型检查，无需类型断言
-- **性能优化**：针对 Go 的 runtime 特性优化（如 `sync.Pool`、unsafe 指针等）
-
-[查看详细对比 →](docs/comparison-with-dotnet.md)
+- [x] Web 框架基础
+- [x] 依赖注入
+- [x] 配置管理
+- [x] 请求验证
+- [x] 日志系统
+- [x] 错误处理
+- [x] 后台服务
+- [x] Swagger 集成
+- [ ] 数据库集成 (GORM)
+- [ ] 认证授权 (JWT)
+- [ ] 缓存支持 (Redis)
+- [ ] 消息队列支持
+- [ ] 健康检查
+- [ ] 限流和熔断
+- [ ] 分布式追踪
 
 ## 🤝 贡献
 
-欢迎贡献代码、报告问题或提出建议！
+欢迎贡献！请查看 [贡献指南](CONTRIBUTING.md) 了解详情。
 
 ## 📄 许可证
 
-MIT License
+本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+
+## 🙏 鸣谢
+
+感谢所有贡献者和以下项目的启发：
+
+- [ASP.NET Core](https://github.com/dotnet/aspnetcore) - 现代 Web 框架的典范
+- [Gin](https://github.com/gin-gonic/gin) - 高性能的 Go Web 框架
+- [Echo](https://github.com/labstack/echo) - 极简的 Go Web 框架
+
+## 📮 联系方式
+
+- 问题反馈：[GitHub Issues](https://github.com/gocrud/csgo/issues)
+- 讨论交流：[GitHub Discussions](https://github.com/gocrud/csgo/discussions)
 
 ---
 
-**Star ⭐ 如果这个项目对你有帮助！**
+<div align="center">
+
+**[快速开始](docs/00-getting-started/)** | **[完整文档](docs/)** | **[示例项目](examples/)**
+
+</div>
+

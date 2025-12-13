@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/openapi"
 	"github.com/gocrud/csgo/web"
 )
@@ -10,11 +11,7 @@ import (
 // Corresponds to .NET app.UseSwagger().
 func UseSwagger(app *web.WebApplication) {
 	// Get Swagger options from DI
-	var opts *SwaggerGenOptions
-	err := app.Services.GetService(&opts) // ✅ Direct access
-	if err != nil {
-		opts = NewSwaggerGenOptions()
-	}
+	opts := di.GetOr[*SwaggerGenOptions](app.Services, NewSwaggerGenOptions())
 
 	// Create OpenAPI generator
 	generator := openapi.NewGenerator(opts.Title, opts.Version).

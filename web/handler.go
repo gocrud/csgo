@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gocrud/csgo/di"
 )
 
 // Handler represents a unified handler type that can be:
@@ -16,64 +17,95 @@ type HandlerFunc func(*HttpContext)
 // ActionHandlerFunc is a handler function that returns IActionResult.
 type ActionHandlerFunc func(*HttpContext) IActionResult
 
+// MakeToGinHandler creates a handler converter that injects services into HttpContext.
+// This factory function captures the services and returns a converter function.
+func MakeToGinHandler(services di.IServiceProvider) func(Handler) gin.HandlerFunc {
+	return func(handler Handler) gin.HandlerFunc {
+		switch h := handler.(type) {
+		case gin.HandlerFunc:
+			// Already a gin.HandlerFunc, use as-is
+			return h
+
+		case func(*gin.Context):
+			// Raw gin handler function
+			return h
+
+		case HandlerFunc:
+			// HttpContext handler without return value
+			return func(c *gin.Context) {
+				ctx := &HttpContext{
+					gin:      c,
+					Services: services,
+				}
+				h(ctx)
+			}
+
+		case func(*HttpContext):
+			// HttpContext handler without return value (type alias)
+			return func(c *gin.Context) {
+				ctx := &HttpContext{
+					gin:      c,
+					Services: services,
+				}
+				h(ctx)
+			}
+
+		case ActionHandlerFunc:
+			// ActionResult handler
+			return func(c *gin.Context) {
+				ctx := &HttpContext{
+					gin:      c,
+					Services: services,
+				}
+				result := h(ctx)
+				if result != nil {
+					result.ExecuteResult(c)
+				}
+			}
+
+		case func(*HttpContext) IActionResult:
+			// ActionResult handler (type alias)
+			return func(c *gin.Context) {
+				ctx := &HttpContext{
+					gin:      c,
+					Services: services,
+				}
+				result := h(ctx)
+				if result != nil {
+					result.ExecuteResult(c)
+				}
+			}
+
+		default:
+			// Fallback: panic with clear error message
+			panic("unsupported handler type: must be gin.HandlerFunc, func(*HttpContext), or func(*HttpContext) IActionResult")
+		}
+	}
+}
+
 // ToGinHandler converts various handler types to gin.HandlerFunc.
-// Supported types:
-// - gin.HandlerFunc: used as-is
-// - func(*HttpContext): wrapped to gin.HandlerFunc
-// - func(*HttpContext) IActionResult: wrapped and executes result
+// Deprecated: Use MakeToGinHandler factory function instead to inject services.
+// This function creates HttpContext without services, for backward compatibility only.
 func ToGinHandler(handler Handler) gin.HandlerFunc {
-	switch h := handler.(type) {
-	case gin.HandlerFunc:
-		// Already a gin.HandlerFunc, use as-is
-		return h
+	return MakeToGinHandler(nil)(handler)
+}
 
-	case func(*gin.Context):
-		// Raw gin handler function
-		return h
-
-	case HandlerFunc:
-		// HttpContext handler without return value
-		return func(c *gin.Context) {
-			h(NewHttpContext(c))
+// MakeToGinHandlers creates a function that converts multiple handlers with services injection.
+func MakeToGinHandlers(services di.IServiceProvider) func(...Handler) []gin.HandlerFunc {
+	converter := MakeToGinHandler(services)
+	return func(handlers ...Handler) []gin.HandlerFunc {
+		result := make([]gin.HandlerFunc, len(handlers))
+		for i, h := range handlers {
+			result[i] = converter(h)
 		}
-
-	case func(*HttpContext):
-		// HttpContext handler without return value (type alias)
-		return func(c *gin.Context) {
-			h(NewHttpContext(c))
-		}
-
-	case ActionHandlerFunc:
-		// ActionResult handler
-		return func(c *gin.Context) {
-			result := h(NewHttpContext(c))
-			if result != nil {
-				result.ExecuteResult(c)
-			}
-		}
-
-	case func(*HttpContext) IActionResult:
-		// ActionResult handler (type alias)
-		return func(c *gin.Context) {
-			result := h(NewHttpContext(c))
-			if result != nil {
-				result.ExecuteResult(c)
-			}
-		}
-
-	default:
-		// Fallback: panic with clear error message
-		panic("unsupported handler type: must be gin.HandlerFunc, func(*HttpContext), or func(*HttpContext) IActionResult")
+		return result
 	}
 }
 
 // ToGinHandlers converts multiple handlers to gin.HandlerFunc slice.
+// Deprecated: Use MakeToGinHandlers factory function instead to inject services.
 func ToGinHandlers(handlers ...Handler) []gin.HandlerFunc {
-	result := make([]gin.HandlerFunc, len(handlers))
-	for i, h := range handlers {
-		result[i] = ToGinHandler(h)
-	}
-	return result
+	return MakeToGinHandlers(nil)(handlers...)
 }
 
 // WrapHttpContext wraps a HttpContext handler to gin.HandlerFunc.

@@ -17,12 +17,12 @@ type Environment struct {
 
 // NewEnvironment creates a new Environment.
 func NewEnvironment() *Environment {
-	envName := os.Getenv("ASPNETCORE_ENVIRONMENT")
+	envName := os.Getenv("CSGO_ENVIRONMENT")
 	if envName == "" {
-		envName = os.Getenv("DOTNET_ENVIRONMENT")
+		envName = os.Getenv("ENVIRONMENT")
 	}
 	if envName == "" {
-		envName = "Production"
+		envName = "development"
 	}
 	return &Environment{name: envName}
 }
@@ -32,14 +32,13 @@ func (e *Environment) Name() string {
 }
 
 func (e *Environment) IsDevelopment() bool {
-	return e.name == "Development"
+	return e.name == "development"
 }
 
 func (e *Environment) IsStaging() bool {
-	return e.name == "Staging"
+	return e.name == "staging"
 }
 
 func (e *Environment) IsProduction() bool {
-	return e.name == "Production"
+	return e.name == "production"
 }
-

@@ -46,10 +46,10 @@ func CreateDefaultBuilder(args ...string) *HostBuilder {
 	services := di.NewServiceCollection()
 
 	// Register core services
-	services.AddSingleton(func() configuration.IConfiguration { return configManager })
-	services.AddSingleton(func() configuration.IConfigurationManager { return configManager })
-	services.AddSingleton(func() *Environment { return env })
-	services.AddSingleton(func() IHostApplicationLifetime { return NewApplicationLifetime() })
+	services.Add(func() configuration.IConfiguration { return configManager })
+	services.Add(func() configuration.IConfigurationManager { return configManager })
+	services.Add(func() *Environment { return env })
+	services.Add(func() IHostApplicationLifetime { return NewApplicationLifetime() })
 
 	// Register logging services by default (like .NET)
 	// This will read configuration from appsettings.json automatically
@@ -103,13 +103,10 @@ func (b *HostBuilder) ConfigureHostConfiguration(configure func(config configura
 // Build builds the host.
 func (b *HostBuilder) Build() IHost {
 	// Build service provider
-	provider := b.Services.BuildServiceProvider()
+	provider := di.BuildServiceProvider(b.Services)
 
 	// Get application lifetime
-	var lifetime IHostApplicationLifetime
-	if err := provider.GetService(&lifetime); err != nil {
-		lifetime = NewApplicationLifetime()
-	}
+	lifetime := di.GetOr(provider, NewApplicationLifetime())
 
 	// Resolve hosted services
 	hostedServices := b.resolveHostedServices(provider)
@@ -125,14 +122,8 @@ func (b *HostBuilder) Build() IHost {
 
 // resolveHostedServices resolves all registered hosted services using new API
 func (b *HostBuilder) resolveHostedServices(provider di.IServiceProvider) []IHostedService {
-	var services []IHostedService
-
-	// Use new pointer-filling API
-	if err := provider.GetServices(&services); err != nil {
-		// No hosted services registered or error occurred
-		return []IHostedService{}
-	}
-
+	// Use GetAll generic API
+	services := di.GetAll[IHostedService](provider)
 	return services
 }
 

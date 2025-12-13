@@ -20,7 +20,7 @@ func AddLogging(services di.IServiceCollection, config configuration.IConfigurat
 	factory := NewZerologFactory(zerologLogger, opts.MinLevel)
 
 	// Register ILoggerFactory as singleton
-	services.AddSingleton(func() ILoggerFactory {
+	services.Add(func() ILoggerFactory {
 		return factory
 	})
 }
@@ -37,7 +37,7 @@ func AddZerolog(services di.IServiceCollection, configure func(*LoggingOptions))
 	factory := NewZerologFactory(zerologLogger, opts.MinLevel)
 
 	// Register ILoggerFactory as singleton
-	services.AddSingleton(func() ILoggerFactory {
+	services.Add(func() ILoggerFactory {
 		return factory
 	})
 }

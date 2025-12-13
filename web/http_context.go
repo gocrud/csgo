@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/errors"
 	"github.com/gocrud/csgo/validation"
 )
@@ -14,6 +15,10 @@ import (
 // Access the underlying gin.Context via RawCtx() method.
 type HttpContext struct {
 	gin *gin.Context
+
+	// Services provides access to the application's DI container.
+	// Use di.Get[T](ctx.Services) to resolve services.
+	Services di.IServiceProvider
 }
 
 // NewHttpContext creates a new HttpContext from gin.Context.

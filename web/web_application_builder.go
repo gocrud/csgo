@@ -72,14 +72,21 @@ func (b *WebApplicationBuilder) Build() *WebApplication {
 	// Build host using internal HostBuilder (like .NET's approach)
 	host := b.hostBuilder.Build()
 
-	// Create web application with shared URL pointer
+	// Get the service provider
+	services := host.Services()
+
+	// Create web application with shared URL pointer and handler converters
 	app := &WebApplication{
 		host:        host,
 		engine:      engine,
-		Services:    host.Services(),
+		Services:    services,
 		routes:      make([]*routing.RouteBuilder, 0),
 		groups:      make([]*routing.RouteGroupBuilder, 0),
 		runtimeUrls: runtimeUrls, // Shared pointer
+
+		// Initialize handler converters with services injection
+		toHandler:  MakeToGinHandler(services),
+		toHandlers: MakeToGinHandlers(services),
 	}
 
 	return app

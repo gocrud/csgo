@@ -73,7 +73,7 @@ func (b *WebApplicationBuilder) AddControllers(configure ...func(*ControllerOpti
 	}
 
 	// Store options for later use
-	b.Services.AddSingleton(func() *ControllerOptions { return opts })
+	b.Services.Add(func() *ControllerOptions { return opts })
 
 	return b
 }
@@ -112,17 +112,17 @@ func AddController(services di.IServiceCollection, constructor any) {
 
 	// 3. 将 Controller 注册到 DI 容器
 	// 利用 DI 引擎本身的能力来自动解析构造函数的参数
-	services.AddSingleton(constructor)
+	services.Add(constructor)
 
 	// 4. 注册到内部列表，供 MapControllers() 启动时使用
 	// 这里我们创建一个简单的适配器，从 DI 容器中取出已经注册好的实例
 	controllerFactories = append(controllerFactories, func(sp di.IServiceProvider) IController {
 		// 创建一个指向 Controller 类型的指针 (例如 **UserController)
-		// 因为 GetRequiredService 需要接收一个指针
+		// 因为 Get 方法需要接收一个指针
 		target := reflect.New(returnType)
 
 		// 从 DI 容器中解析出刚才注册的 Singleton 实例
-		sp.GetRequiredService(target.Interface())
+		sp.Get(target.Interface())
 
 		// 返回解析出的实例 (转换为 IController 接口)
 		return target.Elem().Interface().(IController)

@@ -26,8 +26,8 @@ type IHost interface {
 	// Run runs the host and blocks until shutdown.
 	Run() error
 
-	// RunAsync runs the host asynchronously.
-	RunAsync(ctx context.Context) error
+	// RunWithContext runs the host with a custom context and blocks until shutdown.
+	RunWithContext(ctx context.Context) error
 }
 
 // Host is the default implementation of IHost.
@@ -118,11 +118,11 @@ func (h *Host) Stop(ctx context.Context) error {
 
 // Run runs the host and blocks until shutdown.
 func (h *Host) Run() error {
-	return h.RunAsync(context.Background())
+	return h.RunWithContext(context.Background())
 }
 
-// RunAsync runs the host asynchronously.
-func (h *Host) RunAsync(ctx context.Context) error {
+// RunWithContext runs the host with a custom context and blocks until shutdown.
+func (h *Host) RunWithContext(ctx context.Context) error {
 	// Start the host
 	if err := h.Start(ctx); err != nil {
 		return err

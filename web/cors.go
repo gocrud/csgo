@@ -52,7 +52,7 @@ func (app *WebApplication) UseCors(configure ...func(*CorsOptions)) *WebApplicat
 // Corresponds to .NET services.AddCors().
 func (b *WebApplicationBuilder) AddCors(configure ...func(*CorsOptions)) *WebApplicationBuilder {
 	// Store CORS options in DI
-	b.Services.AddSingleton(func() *CorsOptions {
+	b.Services.Add(func() *CorsOptions {
 		opts := NewCorsOptions()
 		if len(configure) > 0 && configure[0] != nil {
 			configure[0](opts)
