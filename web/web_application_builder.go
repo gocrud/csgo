@@ -80,6 +80,7 @@ func (b *WebApplicationBuilder) Build() *WebApplication {
 		host:        host,
 		engine:      engine,
 		Services:    services,
+		Environment: b.Environment,
 		routes:      make([]*routing.RouteBuilder, 0),
 		groups:      make([]*routing.RouteGroupBuilder, 0),
 		runtimeUrls: runtimeUrls, // Shared pointer

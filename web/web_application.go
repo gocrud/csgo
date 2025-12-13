@@ -14,6 +14,7 @@ type WebApplication struct {
 	host        hosting.IHost
 	engine      *gin.Engine
 	Services    di.IServiceProvider // ✅ 直接暴露，强类型
+	Environment hosting.IHostEnvironment
 	routes      []*routing.RouteBuilder
 	groups      []*routing.RouteGroupBuilder
 	runtimeUrls *[]string // Pointer to runtime URLs (shared with HttpServer)
