@@ -114,6 +114,7 @@ type Schema struct {
 	MinLength   *int              `json:"minLength,omitempty"`
 	MaxLength   *int              `json:"maxLength,omitempty"`
 	Pattern     string            `json:"pattern,omitempty"`
+	Nullable    bool              `json:"nullable,omitempty"`
 }
 
 // Tag adds metadata to a single tag.

@@ -15,27 +15,29 @@ type IEndpointConventionBuilder interface {
 
 // RouteBuilder implements IEndpointConventionBuilder.
 type RouteBuilder struct {
-	method         string
-	path           string
-	name           string
-	displayName    string
-	summary        string
-	description    string
-	tags           []string
-	metadata       []interface{}
-	authPolicies   []string
-	allowAnonymous bool
-	openApiEnabled bool
+	method                  string
+	path                    string
+	name                    string
+	displayName             string
+	summary                 string
+	description             string
+	tags                    []string
+	metadata                []interface{}
+	authPolicies            []string
+	allowAnonymous          bool
+	openApiEnabled          bool
+	apiSecurityRequirements []map[string][]string // OpenAPI security requirements
 }
 
 // NewRouteBuilder creates a new RouteBuilder.
 func NewRouteBuilder(method, path string) *RouteBuilder {
 	return &RouteBuilder{
-		method:       method,
-		path:         path,
-		tags:         make([]string, 0),
-		metadata:     make([]interface{}, 0),
-		authPolicies: make([]string, 0),
+		method:                  method,
+		path:                    path,
+		tags:                    make([]string, 0),
+		metadata:                make([]interface{}, 0),
+		authPolicies:            make([]string, 0),
+		apiSecurityRequirements: make([]map[string][]string, 0),
 	}
 }
 
@@ -105,9 +107,11 @@ func (b *RouteBuilder) SetAllowAnonymous(allow bool) {
 
 // ResponseMetadata represents response metadata.
 type ResponseMetadata struct {
-	StatusCode int
-	Type       reflect.Type
-	IsProblem  bool
+	StatusCode      int
+	Type            reflect.Type
+	IsProblem       bool
+	IsApiResponse   bool // Indicates if the response should be wrapped in web.ApiResponse
+	IsErrorResponse bool // Indicates if this is an error response (only error field populated)
 }
 
 // RequestMetadata represents request metadata.
@@ -168,4 +172,24 @@ func (b *RouteBuilder) GetMetadata() []interface{} {
 // IsOpenApiEnabled returns whether OpenAPI documentation is enabled for this endpoint.
 func (b *RouteBuilder) IsOpenApiEnabled() bool {
 	return b.openApiEnabled
+}
+
+// SetApiSecurityRequirements sets the API security requirements for OpenAPI documentation.
+func (b *RouteBuilder) SetApiSecurityRequirements(requirements []map[string][]string) {
+	b.apiSecurityRequirements = requirements
+}
+
+// GetApiSecurityRequirements returns the API security requirements.
+func (b *RouteBuilder) GetApiSecurityRequirements() []map[string][]string {
+	return b.apiSecurityRequirements
+}
+
+// AddApiSecurityRequirement adds a single security requirement.
+func (b *RouteBuilder) AddApiSecurityRequirement(name string, scopes []string) {
+	if scopes == nil {
+		scopes = []string{}
+	}
+	b.apiSecurityRequirements = append(b.apiSecurityRequirements, map[string][]string{
+		name: scopes,
+	})
 }

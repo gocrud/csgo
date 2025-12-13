@@ -47,12 +47,55 @@ func OptTags(tags ...string) routing.EndpointOption {
 }
 
 // OptResponse returns an option that adds a response type (generic).
-func OptResponse[T any](statusCode int) routing.EndpointOption {
+// Default status code is 200 if not specified.
+// Example: OptResponse[User]() or OptResponse[User](201)
+func OptResponse[T any](statusCode ...int) routing.EndpointOption {
+	code := 200
+	if len(statusCode) > 0 {
+		code = statusCode[0]
+	}
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
 			rb.AddResponseMetadata(routing.ResponseMetadata{
-				StatusCode: statusCode,
+				StatusCode: code,
 				Type:       reflect.TypeOf((*T)(nil)).Elem(),
+			})
+		}
+		return b
+	}
+}
+
+// OptApiResponse returns an option that adds a response type wrapped in web.ApiResponse.
+// Default status code is 200 if not specified.
+// Example: OptApiResponse[LoginResponse]() or OptApiResponse[User](201)
+// Generated schema structure: {success: true, data: T, error: null}
+func OptApiResponse[T any](statusCode ...int) routing.EndpointOption {
+	code := 200
+	if len(statusCode) > 0 {
+		code = statusCode[0]
+	}
+	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
+		if rb, ok := b.(*routing.RouteBuilder); ok {
+			rb.AddResponseMetadata(routing.ResponseMetadata{
+				StatusCode:    code,
+				Type:          reflect.TypeOf((*T)(nil)).Elem(),
+				IsApiResponse: true,
+			})
+		}
+		return b
+	}
+}
+
+// OptApiErrorResponse returns an option that adds an error response wrapped in web.ApiResponse.
+// Example: OptApiErrorResponse(404) or OptApiErrorResponse(400)
+// Generated schema structure: {success: false, data: null, error: ApiError}
+func OptApiErrorResponse(statusCode int) routing.EndpointOption {
+	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
+		if rb, ok := b.(*routing.RouteBuilder); ok {
+			rb.AddResponseMetadata(routing.ResponseMetadata{
+				StatusCode:      statusCode,
+				IsApiResponse:   true,
+				IsErrorResponse: true,
 			})
 		}
 		return b
@@ -94,11 +137,13 @@ func OptRequest[T any](contentType ...string) routing.EndpointOption {
 	}
 }
 
-// OptAuthorization returns an option that adds authorization requirements.
-func OptAuthorization(policies ...string) routing.EndpointOption {
+// OptApiAuth returns an option that adds API authentication requirement for OpenAPI documentation.
+// This will display a lock icon in Swagger UI and include auth parameters in requests.
+// Example: OptApiAuth("Bearer") or OptApiAuth("Bearer", "read", "write")
+func OptApiAuth(name string, scopes ...string) routing.EndpointOption {
 	return func(b routing.IEndpointConventionBuilder) routing.IEndpointConventionBuilder {
 		if rb, ok := b.(*routing.RouteBuilder); ok {
-			rb.SetAuthorizationPolicies(policies)
+			rb.AddApiSecurityRequirement(name, scopes)
 		}
 		return b
 	}

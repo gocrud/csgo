@@ -70,6 +70,7 @@ type RouteInfo interface {
 	GetTags() []string
 	GetMetadata() []interface{}
 	IsOpenApiEnabled() bool
+	GetApiSecurityRequirements() []map[string][]string
 }
 
 // Generate generates the OpenAPI specification.
@@ -116,6 +117,12 @@ func (g *Generator) addRoute(spec *Specification, route RouteInfo) {
 		OperationID: generateOperationID(method, path),
 		Tags:        route.GetTags(),
 		Responses:   make(map[string]Response),
+	}
+
+	// Set security requirements
+	securityReqs := route.GetApiSecurityRequirements()
+	if len(securityReqs) > 0 {
+		op.Security = securityReqs
 	}
 
 	// Process metadata
@@ -197,6 +204,8 @@ func (g *Generator) addResponse(spec *Specification, op *Operation, meta interfa
 
 	statusCode := int(v.FieldByName("StatusCode").Int())
 	isProblem := v.FieldByName("IsProblem").Bool()
+	isApiResponse := v.FieldByName("IsApiResponse").Bool()
+	isErrorResponse := v.FieldByName("IsErrorResponse").Bool()
 	typeField := v.FieldByName("Type")
 
 	statusCodeStr := strings.TrimSpace(strings.Split(strings.TrimPrefix(http.StatusText(statusCode), "HTTP "), " ")[0])
@@ -223,6 +232,59 @@ func (g *Generator) addResponse(spec *Specification, op *Operation, meta interfa
 		return
 	}
 
+	// Handle ApiResponse wrapped responses
+	if isApiResponse {
+		// Register ApiError schema if not already registered
+		if _, exists := spec.Components.Schemas["ApiError"]; !exists {
+			spec.Components.Schemas["ApiError"] = g.getApiErrorSchema()
+		}
+
+		var apiResponseSchema Schema
+
+		if isErrorResponse {
+			// Error response: {success: false, error: ApiError}
+			// 只显示 success 和 error，不显示 data（因为实际响应中有 omitempty）
+			apiResponseSchema = Schema{
+				Type: "object",
+				Properties: map[string]Schema{
+					"success": {Type: "boolean", Description: "请求是否成功"},
+					"error":   {Ref: "#/components/schemas/ApiError", Description: "错误信息"},
+				},
+			}
+		} else if typeField.IsValid() && !typeField.IsZero() {
+			// Success response with data: {success: true, data: T}
+			// 只显示 success 和 data，不显示 error（因为实际响应中有 omitempty）
+			reflectType := typeField.Interface().(reflect.Type)
+			dataSchema := g.generateSchemaFromReflectType(spec, reflectType)
+			apiResponseSchema = Schema{
+				Type: "object",
+				Properties: map[string]Schema{
+					"success": {Type: "boolean", Description: "请求是否成功"},
+					"data":    dataSchema,
+				},
+			}
+		} else {
+			// Success response without specific data type: {success: true, data: object}
+			// 只显示 success 和 data，不显示 error（因为实际响应中有 omitempty）
+			apiResponseSchema = Schema{
+				Type: "object",
+				Properties: map[string]Schema{
+					"success": {Type: "boolean", Description: "请求是否成功"},
+					"data":    {Type: "object", Description: "响应数据"},
+				},
+			}
+		}
+
+		op.Responses[statusCodeStr] = Response{
+			Description: getDefaultResponseDescription(statusCode),
+			Content: map[string]MediaType{
+				"application/json": {Schema: apiResponseSchema},
+			},
+		}
+		return
+	}
+
+	// Handle regular responses (not wrapped in ApiResponse)
 	if typeField.IsValid() && !typeField.IsZero() {
 		reflectType := typeField.Interface().(reflect.Type)
 		schema := g.generateSchemaFromReflectType(spec, reflectType)
@@ -393,6 +455,30 @@ func (g *Generator) getProblemDetailsSchema() Schema {
 			"status":   {Type: "integer"},
 			"detail":   {Type: "string"},
 			"instance": {Type: "string"},
+		},
+	}
+}
+
+// getApiErrorSchema returns the schema for web.ApiError.
+func (g *Generator) getApiErrorSchema() Schema {
+	return Schema{
+		Type: "object",
+		Properties: map[string]Schema{
+			"code":    {Type: "string", Description: "错误码"},
+			"message": {Type: "string", Description: "错误消息"},
+			"fields": {
+				Type: "array",
+				Items: &Schema{
+					Type: "object",
+					Properties: map[string]Schema{
+						"field":   {Type: "string", Description: "字段路径"},
+						"message": {Type: "string", Description: "错误消息"},
+						"code":    {Type: "string", Description: "错误码"},
+					},
+				},
+				Description: "验证错误字段列表",
+			},
+			"details": {Type: "object", Description: "额外详情"},
 		},
 	}
 }
