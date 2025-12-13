@@ -11,7 +11,8 @@ import (
 //   - config := di.Get[AppConfig](provider)      // value type (auto-deref + copy)
 func Get[T any](provider IServiceProvider) T {
 	var zero T
-	t := reflect.TypeOf(zero)
+	// Use reflect.TypeOf with pointer trick to handle interface types correctly
+	t := reflect.TypeOf((*T)(nil)).Elem()
 
 	// Try 1: Direct lookup
 	service, err := provider.resolveType(t)
@@ -37,8 +38,8 @@ func Get[T any](provider IServiceProvider) T {
 //   - config := di.GetOr[*Config](provider, defaultConfig)
 //   - val := di.GetOr[AppConfig](provider, defaultVal)
 func GetOr[T any](provider IServiceProvider, defaultValue T) T {
-	var zero T
-	t := reflect.TypeOf(zero)
+	// Use reflect.TypeOf with pointer trick to handle interface types correctly
+	t := reflect.TypeOf((*T)(nil)).Elem()
 
 	// Try 1: Direct lookup
 	service, err := provider.resolveType(t)
@@ -63,8 +64,8 @@ func GetOr[T any](provider IServiceProvider, defaultValue T) T {
 // Returns a slice of all registered services matching the type.
 //   - plugins := di.GetAll[IPlugin](provider)
 func GetAll[T any](provider IServiceProvider) []T {
-	var zero T
-	t := reflect.TypeOf(zero)
+	// Use reflect.TypeOf with pointer trick to handle interface types correctly
+	t := reflect.TypeOf((*T)(nil)).Elem()
 
 	services := provider.resolveAll(t)
 	result := make([]T, len(services))
@@ -81,7 +82,8 @@ func GetAll[T any](provider IServiceProvider) []T {
 //   - config := di.GetNamed[AppConfig](provider, "app")         // value (auto-deref)
 func GetNamed[T any](provider IServiceProvider, name string) T {
 	var zero T
-	t := reflect.TypeOf(zero)
+	// Use reflect.TypeOf with pointer trick to handle interface types correctly
+	t := reflect.TypeOf((*T)(nil)).Elem()
 
 	// Try 1: Direct lookup
 	service, err := provider.resolveNamed(t, name)
@@ -109,7 +111,8 @@ func GetNamed[T any](provider IServiceProvider, name string) T {
 //   - if val, ok := di.TryGet[AppConfig](provider); ok { ... }
 func TryGet[T any](provider IServiceProvider) (T, bool) {
 	var zero T
-	t := reflect.TypeOf(zero)
+	// Use reflect.TypeOf with pointer trick to handle interface types correctly
+	t := reflect.TypeOf((*T)(nil)).Elem()
 
 	// Try 1: Direct lookup
 	service, err := provider.resolveType(t)
