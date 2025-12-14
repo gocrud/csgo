@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"net/http"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -511,7 +512,28 @@ func getDefaultResponseDescription(statusCode int) string {
 
 // normalizePath converts Gin path format to OpenAPI format.
 // Example: /users/:id -> /users/{id}
+// Ensures all paths start with "/" as required by OpenAPI specification.
+// Supports various input formats: "api", "/api", "users", "/users"
 func normalizePath(p string) string {
+	// 1. Handle empty path
+	if p == "" {
+		return "/"
+	}
+
+	// 2. Clean the path (removes duplicate slashes, resolves . and ..)
+	p = path.Clean(p)
+
+	// 3. path.Clean converts empty string to ".", handle that case
+	if p == "." {
+		return "/"
+	}
+
+	// 4. Ensure leading slash (OpenAPI specification requirement)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+
+	// 5. Convert Gin path parameter format to OpenAPI format
 	parts := strings.Split(p, "/")
 	for i, part := range parts {
 		if strings.HasPrefix(part, ":") {
@@ -520,7 +542,15 @@ func normalizePath(p string) string {
 			parts[i] = "{" + part[1:] + "}"
 		}
 	}
-	return strings.Join(parts, "/")
+
+	result := strings.Join(parts, "/")
+
+	// 6. Special case: prevent double slash at root
+	if result == "//" {
+		result = "/"
+	}
+
+	return result
 }
 
 // generateOperationID creates a camelCase operation ID from method and path.
