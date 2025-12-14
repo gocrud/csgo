@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -151,6 +152,10 @@ func (s *HttpServer) executeAsync(ctx context.Context) error {
 		// Get actual listen address (runtime URLs override default)
 		addr := s.getListenAddr()
 
+		// Check if port is available and find an alternative if needed
+		originalAddr := addr
+		addr, portChanged := s.ensurePortAvailable(addr)
+
 		displayAddr := addr
 		if strings.HasPrefix(addr, ":") {
 			displayAddr = "http://localhost" + addr
@@ -161,7 +166,19 @@ func (s *HttpServer) executeAsync(ctx context.Context) error {
 		fmt.Println("========================================")
 		fmt.Println("🚀 Web Application Started")
 		fmt.Println("========================================")
+		if portChanged {
+			originalPort := extractPort(originalAddr)
+			newPort := extractPort(addr)
+			fmt.Printf("⚠️  Port %s is already in use, using port %s instead\n", originalPort, newPort)
+		}
 		fmt.Printf("📍 Listening on: %s\n", displayAddr)
+
+		// Check if Swagger UI is registered and print the URL
+		if s.hasSwaggerRoute() {
+			swaggerURL := displayAddr + "/swagger"
+			fmt.Printf("📚 Swagger UI: %s\n", swaggerURL)
+		}
+
 		fmt.Println("========================================")
 		fmt.Println("")
 
@@ -192,6 +209,104 @@ func (s *HttpServer) getListenAddr() string {
 	}
 	// Fall back to default address
 	return s.defaultAddr
+}
+
+// ensurePortAvailable checks if the port is available, and finds an alternative if not.
+// Returns the final address and a boolean indicating if the port was changed.
+func (s *HttpServer) ensurePortAvailable(addr string) (string, bool) {
+	// Extract port from address
+	port := extractPort(addr)
+	if port == "" {
+		return addr, false
+	}
+
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		return addr, false
+	}
+
+	// Check if current port is available
+	if isPortAvailable(portNum) {
+		return addr, false
+	}
+
+	// Find next available port
+	newPort, err := findAvailablePort(portNum+1, 100)
+	if err != nil {
+		// If we can't find an available port, return original and let it fail with proper error
+		return addr, false
+	}
+
+	// Replace port in address
+	newAddr := replacePort(addr, strconv.Itoa(newPort))
+	return newAddr, true
+}
+
+// hasSwaggerRoute checks if Swagger routes are registered in the engine.
+func (s *HttpServer) hasSwaggerRoute() bool {
+	routes := s.engine.Routes()
+	for _, route := range routes {
+		if strings.HasPrefix(route.Path, "/swagger") {
+			return true
+		}
+	}
+	return false
+}
+
+// isPortAvailable checks if a port is available for listening.
+func isPortAvailable(port int) bool {
+	addr := fmt.Sprintf(":%d", port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false
+	}
+	listener.Close()
+	return true
+}
+
+// findAvailablePort finds the next available port starting from startPort.
+func findAvailablePort(startPort int, maxAttempts int) (int, error) {
+	for i := 0; i < maxAttempts; i++ {
+		port := startPort + i
+		if port > 65535 {
+			break
+		}
+		if isPortAvailable(port) {
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("no available port found after %d attempts", maxAttempts)
+}
+
+// extractPort extracts the port number from an address string.
+func extractPort(addr string) string {
+	// Handle :port format
+	if strings.HasPrefix(addr, ":") {
+		return addr[1:]
+	}
+
+	// Handle host:port format
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[idx+1:]
+	}
+
+	return ""
+}
+
+// replacePort replaces the port in an address string.
+func replacePort(addr string, newPort string) string {
+	// Handle :port format
+	if strings.HasPrefix(addr, ":") {
+		return ":" + newPort
+	}
+
+	// Handle host:port format
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx+1] + newPort
+	}
+
+	// If no port found, append it
+	return addr + ":" + newPort
 }
 
 // getListenAddress returns the listen address from configuration or default.
