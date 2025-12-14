@@ -10,22 +10,20 @@
 
 - ✅ 创建自定义中间件
 - ✅ 实现后台服务
-- ✅ 使用结构化日志
 - ✅ 编写测试
 - ✅ 构建复杂应用
 
 ## 学习时长
 
-⏱️ 预计时间：12-16 小时
+⏱️ 预计时间：10-14 小时
 
 ## 学习路径
 
 ### 1. [自定义中间件](middleware.md)
 ### 2. [后台服务](background-services.md)
-### 3. [结构化日志](logging.md)
-### 4. [测试](testing.md)
-### 5. [性能优化](performance.md)
-### 6. [实践项目：完整应用](project-complete-app.md)
+### 3. [测试](testing.md)
+### 4. [性能优化](performance.md)
+### 5. [实践项目：完整应用](project-complete-app.md)
 
 ## 前置要求
 

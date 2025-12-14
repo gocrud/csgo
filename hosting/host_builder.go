@@ -6,7 +6,6 @@ import (
 
 	"github.com/gocrud/csgo/configuration"
 	"github.com/gocrud/csgo/di"
-	"github.com/gocrud/csgo/logging"
 )
 
 // IHostBuilder provides a mechanism for configuring and creating a host.
@@ -50,10 +49,6 @@ func CreateDefaultBuilder(args ...string) *HostBuilder {
 	services.Add(func() configuration.IConfigurationManager { return configManager })
 	services.Add(func() *Environment { return env })
 	services.Add(func() IHostApplicationLifetime { return NewApplicationLifetime() })
-
-	// Register logging services by default (like .NET)
-	// This will read configuration from appsettings.json automatically
-	addDefaultLogging(services, configManager, env)
 
 	return &HostBuilder{
 		Services:             services,
@@ -144,14 +139,4 @@ func (b *HostBuilder) getShutdownTimeout() time.Duration {
 	}
 
 	return 30 * time.Second
-}
-
-// addDefaultLogging adds default logging services to the service collection.
-// This is called automatically by CreateDefaultBuilder().
-func addDefaultLogging(services di.IServiceCollection, config configuration.IConfiguration, env *Environment) {
-	// Use zerolog-based logging with configuration support
-	logging.AddLogging(services, config)
-
-	// In development, we could customize further if needed
-	// The configuration will be read from appsettings.json automatically
 }
