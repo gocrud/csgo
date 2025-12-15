@@ -496,7 +496,6 @@ CSGO 基于以下优秀的开源项目构建：
 | 项目 | 用途 |
 |------|------|
 | [Gin](https://github.com/gin-gonic/gin) | 高性能 HTTP Web 框架 |
-| [Zerolog](https://github.com/rs/zerolog) | 零分配 JSON 日志库 |
 
 ---
 
@@ -522,17 +521,6 @@ CSGO 基于以下优秀的开源项目构建：
 ## 📄 许可证
 
 本项目采用 [MIT 许可证](LICENSE)。
-
----
-
-## 🙏 致谢
-
-感谢以下项目的灵感和启发：
-
-- **[ASP.NET Core](https://github.com/dotnet/aspnetcore)** - 现代 Web 框架的典范
-- **[Gin](https://github.com/gin-gonic/gin)** - 卓越的 Go Web 框架
-- **[Echo](https://github.com/labstack/echo)** - 高性能、极简的框架
-- **[Spring Boot](https://spring.io/projects/spring-boot)** - Java 企业级开发标杆
 
 ---
 
