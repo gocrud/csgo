@@ -24,6 +24,7 @@ type RegistrationKey struct {
 
 // Registration 注册信息
 type Registration struct {
+	ID                 TypeID // Cached TypeID for performance
 	ServiceType        reflect.Type
 	ImplementationType reflect.Type
 	Lifetime           ServiceLifetime
@@ -155,13 +156,17 @@ func (e *Engine) Compile() error {
 	e.singletons.Store(singletons)
 	for _, key := range sorted {
 		reg := e.registrations[key]
-		if reg != nil && reg.Lifetime == Singleton {
-			instance, err := e.createInstance(reg)
-			if err != nil {
-				return fmt.Errorf("failed to create singleton %v: %w", reg.ServiceType, err)
+		if reg != nil {
+			// Cache TypeID for performance
+			reg.ID = e.registry.GetID(key.Type, key.Name)
+
+			if reg.Lifetime == Singleton {
+				instance, err := e.createInstance(reg, []string{})
+				if err != nil {
+					return fmt.Errorf("failed to create singleton %v: %w", reg.ServiceType, err)
+				}
+				singletons[int(reg.ID)] = instance
 			}
-			id := e.registry.GetID(key.Type, key.Name)
-			singletons[int(id)] = instance
 		}
 	}
 
@@ -171,21 +176,64 @@ func (e *Engine) Compile() error {
 
 // Resolve 解析服务（只支持Singleton）
 func (e *Engine) Resolve(serviceType reflect.Type, name string) (interface{}, error) {
+	return e.resolveInternal(serviceType, name, []string{})
+}
+
+func (e *Engine) resolveInternal(serviceType reflect.Type, name string, chain []string) (interface{}, error) {
 	if !e.compiled.Load() {
 		return nil, errors.New("engine not compiled")
 	}
 
 	key := RegistrationKey{Type: serviceType, Name: name}
 
-	_, exists := e.registrations[key]
+	reg, exists := e.registrations[key]
 	if !exists {
-		return nil, fmt.Errorf("service %v not found", serviceType)
+		// Only format the tree if we're actually failing here
+		tree := formatDependencyTree(chain, formatType(serviceType))
+		return nil, fmt.Errorf("service '%s' not found:%s\n  Cause: service not registered",
+			formatType(serviceType), tree)
 	}
 
 	// All services are Singleton - retrieve from pre-compiled cache
+	// Use cached ID to avoid registry lock
 	singletons := e.singletons.Load().([]interface{})
-	id := e.registry.GetID(key.Type, key.Name)
-	return singletons[int(id)], nil
+	return singletons[int(reg.ID)], nil
+}
+
+// formatDependencyTree formats the dependency chain into a tree structure
+func formatDependencyTree(chain []string, current string) string {
+	if len(chain) == 0 {
+		return fmt.Sprintf("\n  └─ ❌ %s", current)
+	}
+
+	var builder string
+	builder += "\n"
+
+	indent := "  "
+	for _, node := range chain {
+		builder += fmt.Sprintf("%s└─ %s\n", indent, node)
+		indent += "   "
+	}
+	builder += fmt.Sprintf("%s└─ ❌ %s", indent, current)
+
+	return builder
+}
+
+// formatType returns a fully qualified type name
+func formatType(t reflect.Type) string {
+	if t == nil {
+		return "nil"
+	}
+
+	// Handle pointers recursively
+	if t.Kind() == reflect.Ptr {
+		return "*" + formatType(t.Elem())
+	}
+
+	if t.PkgPath() == "" {
+		return t.String()
+	}
+	return t.PkgPath() + "." + t.Name()
 }
 
 // ResolveAll 解析所有服务
@@ -212,7 +260,11 @@ func (e *Engine) ResolveAll(serviceType reflect.Type) ([]interface{}, error) {
 }
 
 // createInstance 创建实例
-func (e *Engine) createInstance(reg *Registration) (interface{}, error) {
+func (e *Engine) createInstance(reg *Registration, chain []string) (interface{}, error) {
+	// Add current service to chain
+	currentType := formatType(reg.ServiceType)
+	newChain := append(chain, currentType)
+
 	// 解析依赖
 	args := make([]reflect.Value, len(reg.InputTypes))
 	for i, depType := range reg.InputTypes {
@@ -222,14 +274,26 @@ func (e *Engine) createInstance(reg *Registration) (interface{}, error) {
 
 		if !e.compiled.Load() {
 			// 编译期间的解析
-			dep, err = e.resolveDuringCompile(depType, "")
+			dep, err = e.resolveDuringCompile(depType, "", newChain)
 		} else {
 			// 运行时解析
-			dep, err = e.Resolve(depType, "")
+			// Note: At runtime, ResolveInternal only returns singletons.
+			// Ideally we shouldn't be calling createInstance at runtime for Singletons if they are pre-created.
+			// But if we support transient/scoped in future, this path is needed.
+			// Current implementation only supports Singleton and pre-creates them.
+			// However, Resolve calls resolveInternal which does lookup.
+			dep, err = e.resolveInternal(depType, "", newChain)
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve dependency %v: %w", depType, err)
+			// If it's already our formatted error, just wrap it or return it
+			// But we want to ensure the chain is preserved if the error came from deep down
+			// Actually, the error from deep down already has the tree.
+			// We might just want to prepend our info if needed, but usually the deep error is enough.
+			// However, to match the tree structure, the deep error has the full tree from ITS perspective.
+			// If we want to show the full tree from ROOT, we rely on the chain being passed down.
+			// The error returned from recursive call ALREADY has the full tree because we passed 'newChain'.
+			return nil, err
 		}
 		args[i] = reflect.ValueOf(dep)
 	}
@@ -239,26 +303,33 @@ func (e *Engine) createInstance(reg *Registration) (interface{}, error) {
 
 	// 检查错误
 	if len(results) == 2 && !results[1].IsNil() {
-		return nil, results[1].Interface().(error)
+		return nil, fmt.Errorf("factory error for '%s': %w", currentType, results[1].Interface().(error))
 	}
 
 	return results[0].Interface(), nil
 }
 
 // resolveDuringCompile 在编译期间解析依赖（不检查 compiled 标志）
-func (e *Engine) resolveDuringCompile(serviceType reflect.Type, name string) (interface{}, error) {
+func (e *Engine) resolveDuringCompile(serviceType reflect.Type, name string, chain []string) (interface{}, error) {
 	key := RegistrationKey{Type: serviceType, Name: name}
 
 	reg, exists := e.registrations[key]
 	if !exists {
-		return nil, fmt.Errorf("service %v not found", serviceType)
+		tree := formatDependencyTree(chain, formatType(serviceType))
+		return nil, fmt.Errorf("service '%s' not found:%s\n  Cause: service not registered",
+			formatType(serviceType), tree)
 	}
 
 	// 如果是 Singleton，检查是否已经创建
 	if reg.Lifetime == Singleton {
 		singletons := e.singletons.Load()
 		if singletons != nil {
-			id := e.registry.GetID(key.Type, key.Name)
+			// Use cached ID if available, otherwise fallback (though Compile sets it)
+			id := reg.ID
+			if id == 0 { // Just in case it wasn't set yet (circular dep check handles order)
+				id = e.registry.GetID(key.Type, key.Name)
+			}
+
 			if id >= 0 && int(id) < len(singletons.([]interface{})) {
 				if instance := singletons.([]interface{})[int(id)]; instance != nil {
 					return instance, nil
@@ -268,7 +339,7 @@ func (e *Engine) resolveDuringCompile(serviceType reflect.Type, name string) (in
 	}
 
 	// 递归创建实例
-	return e.createInstance(reg)
+	return e.createInstance(reg, chain)
 }
 
 // Contains 检查服务是否存在

@@ -42,16 +42,39 @@ func (g *DependencyGraph) AddNode(key RegistrationKey, dependencies []reflect.Ty
 	g.nodes[key] = node
 }
 
+// Duplicate formatDependencyTree here or move it to a shared utils file.
+// Since they are in the same package 'internal', we can use the one from engine.go if it's exported or in the same package.
+// It is in the same package 'internal', so we can use it directly if it's not private to engine.go
+// Wait, formatDependencyTree was defined in engine.go which is package internal.
+// So we can use it here.
+
 func (g *DependencyGraph) TopologicalSort() ([]RegistrationKey, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	var sorted []RegistrationKey
 
-	var visit func(*GraphNode) error
-	visit = func(node *GraphNode) error {
+	var visit func(*GraphNode, []string) error
+	visit = func(node *GraphNode, path []string) error {
+		currentName := formatType(node.Key.Type)
+		if node.Key.Name != "" {
+			currentName += fmt.Sprintf("(%s)", node.Key.Name)
+		}
+
 		if node.InStack {
-			return fmt.Errorf("circular dependency detected: %v", node.Key.Type)
+			// Found a cycle
+			// Format cycle as a tree-like structure too, or just a simple loop visualization
+			// Since it's a loop, a simple arrow chain might be clearer, but let's stick to the tree style requested
+			// actually, for a cycle, "A -> B -> A", the tree view would be:
+			//   └─ A
+			//      └─ B
+			//         └─ ❌ A (Circular)
+
+			// We need to construct the chain for the formatter
+			// Note: 'path' contains [A, B], and currentName is A.
+			// However, formatDependencyTree expects the chain leading TO the error.
+			tree := formatDependencyTree(path, currentName+" (Circular)")
+			return fmt.Errorf("circular dependency detected:%s", tree)
 		}
 		if node.Visited {
 			return nil
@@ -60,9 +83,11 @@ func (g *DependencyGraph) TopologicalSort() ([]RegistrationKey, error) {
 		node.Visited = true
 		node.InStack = true
 
+		newPath := append(path, currentName)
+
 		for _, depKey := range node.Dependencies {
 			if depNode, exists := g.nodes[depKey]; exists {
-				if err := visit(depNode); err != nil {
+				if err := visit(depNode, newPath); err != nil {
 					return err
 				}
 			}
@@ -75,7 +100,7 @@ func (g *DependencyGraph) TopologicalSort() ([]RegistrationKey, error) {
 
 	for _, node := range g.nodes {
 		if !node.Visited {
-			if err := visit(node); err != nil {
+			if err := visit(node, []string{}); err != nil {
 				return nil, err
 			}
 		}
