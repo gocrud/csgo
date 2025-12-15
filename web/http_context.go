@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -118,6 +119,19 @@ func (c *HttpContext) BizErrorWithStatus(statusCode int, err *errors.BizError) I
 
 // ==================== Binding Helpers ====================
 
+// cleanJSONErrorMessage 清理 JSON 解析错误消息中的字段路径
+// 移除字段路径前面的点和结构体名称，提供更清晰的错误提示
+func cleanJSONErrorMessage(errMsg string) string {
+	// 匹配 "Go struct field .field" 或 "Go struct field StructName.field"
+	// 并替换为 "Go struct field field"
+	// 处理前导点：".info.nickname" -> "info.nickname"
+	// 处理结构体名称："User.name" -> "name"
+	re := regexp.MustCompile(`Go struct field\s+(\w+\.|\.)`)
+	cleaned := re.ReplaceAllString(errMsg, "Go struct field ")
+
+	return cleaned
+}
+
 // BindJSON binds JSON body to target and returns BadRequest if failed.
 // Returns true if binding succeeded, false otherwise.
 func (c *HttpContext) BindJSON(target interface{}) (ok bool, result IActionResult) {
@@ -137,7 +151,8 @@ func (c *HttpContext) BindJSON(target interface{}) (ok bool, result IActionResul
 		// 其他 JSON 解析错误,提供更友好的错误提示
 		if strings.Contains(errMsg, "invalid character") ||
 			strings.Contains(errMsg, "cannot unmarshal") {
-			return false, c.BadRequest("JSON 格式错误: " + errMsg)
+			cleanedMsg := cleanJSONErrorMessage(errMsg)
+			return false, c.BadRequest("JSON 格式错误: " + cleanedMsg)
 		}
 
 		// 未知错误,直接返回原始错误信息
@@ -165,7 +180,8 @@ func (c *HttpContext) MustBindJSON(target interface{}) IActionResult {
 		// 其他 JSON 解析错误,提供更友好的错误提示
 		if strings.Contains(errMsg, "invalid character") ||
 			strings.Contains(errMsg, "cannot unmarshal") {
-			return c.BadRequest("JSON 格式错误: " + errMsg)
+			cleanedMsg := cleanJSONErrorMessage(errMsg)
+			return c.BadRequest("JSON 格式错误: " + cleanedMsg)
 		}
 
 		// 未知错误,直接返回原始错误信息
@@ -207,7 +223,8 @@ func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
 		// 其他 JSON 解析错误,提供更友好的错误提示
 		if strings.Contains(errMsg, "invalid character") ||
 			strings.Contains(errMsg, "cannot unmarshal") {
-			return nil, c.BadRequest("JSON 格式错误: " + errMsg)
+			cleanedMsg := cleanJSONErrorMessage(errMsg)
+			return nil, c.BadRequest("JSON 格式错误: " + cleanedMsg)
 		}
 
 		// 未知错误,直接返回原始错误信息
