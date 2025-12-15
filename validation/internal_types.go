@@ -22,6 +22,10 @@ type Schema struct {
 	FieldNames map[uintptr]string
 	// Offset -> Field Kind (用于 Required 等通用规则判断类型)
 	FieldKinds map[uintptr]reflect.Kind
+	// Offset -> Field Type (用于获取字段详细类型信息，如 Time, Slice 元素类型)
+	FieldTypes map[uintptr]reflect.Type
+	// OrderedOffsets 预先排序的偏移量列表，用于保证验证顺序一致性
+	OrderedOffsets []uintptr
 	// BaseType
 	Type reflect.Type
 	// FailFast 是否快速失败（遇到第一个错误就返回）

@@ -105,8 +105,8 @@ func (s *String) UUID() *String {
 	return s
 }
 
-func (s *String) Pattern(pattern string) *String {
-	validation.RecordRule(unsafe.Pointer(s), "pattern", pattern)
+func (s *String) Regex(pattern string) *String {
+	validation.RecordRule(unsafe.Pointer(s), "regex", pattern)
 	return s
 }
 

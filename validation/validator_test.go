@@ -45,7 +45,7 @@ type PrivateStruct struct {
 
 func TestPrimitives(t *testing.T) {
 	validation.Register(func(u *User) {
-		u.Name.Required().MinLen(3).MaxLen(10)
+		u.Name.Required().MinLen(3).MaxLen(10).Regex("^[a-zA-Z]+$")
 		u.Age.Range(18, 100)
 		u.Email.Email()
 	})
@@ -60,6 +60,7 @@ func TestPrimitives(t *testing.T) {
 		{"NameRequired", User{Age: 25}, true, "is required"},
 		{"NameTooShort", User{Name: "Al", Age: 25}, true, "length must be at least 3"},
 		{"NameTooLong", User{Name: "Christopher", Age: 25}, true, "length must be at most 10"},
+		{"NameRegexFail", User{Name: "Alice123", Age: 25}, true, "must match regex"},
 		{"AgeTooYoung", User{Name: "Alice", Age: 10}, true, "must be between 18 and 100"},
 		{"AgeTooOld", User{Name: "Alice", Age: 101}, true, "must be between 18 and 100"},
 		{"InvalidEmail", User{Name: "Alice", Age: 25, Email: "invalid"}, true, "invalid email format"},

@@ -2,6 +2,7 @@ package validation
 
 import (
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -57,12 +58,23 @@ func register[T any](fn func(*T), failFast bool) {
 		FieldRules: currentRecorder.Rules,
 		FieldNames: make(map[uintptr]string),
 		FieldKinds: make(map[uintptr]reflect.Kind),
+		FieldTypes: make(map[uintptr]reflect.Type), // 初始化 FieldTypes
 		Type:       t,
 		FailFast:   failFast,
 	}
 
 	// 解析结构体字段，映射偏移量到字段名
 	mapOffsetsToNames(t, 0, "", schema)
+
+	// 预先计算排序的 Offsets
+	var offsets []uintptr
+	for offset := range schema.FieldRules {
+		offsets = append(offsets, offset)
+	}
+	sort.Slice(offsets, func(i, j int) bool {
+		return offsets[i] < offsets[j]
+	})
+	schema.OrderedOffsets = offsets
 
 	mu.Lock()
 	schemas[t] = schema
@@ -152,6 +164,8 @@ func mapOffsetsToNames(t reflect.Type, baseOffset uintptr, prefix string, schema
 		schema.FieldNames[absoluteOffset] = fullName
 		// 记录偏移量 -> 类型 Kind
 		schema.FieldKinds[absoluteOffset] = field.Type.Kind()
+		// 记录偏移量 -> 具体 Type (用于获取 Slice 元素类型等)
+		schema.FieldTypes[absoluteOffset] = field.Type
 
 		// 递归处理嵌套结构体
 		// 注意：要避开 v.Int, v.String 这种虽然底层是 int/string 但在反射中可能表现为 Named Type 的情况

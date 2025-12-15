@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -17,6 +16,14 @@ var (
 	emailRegex = regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
 	uuidRegex  = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 )
+
+// sliceHeader mimics reflect.SliceHeader but without the deprecation warning.
+// It matches the memory layout of a Go slice.
+type sliceHeader struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
+}
 
 // Validate 验证对象
 func Validate[T any](obj *T) ValidationErrors {
@@ -32,17 +39,8 @@ func Validate[T any](obj *T) ValidationErrors {
 	basePtr := uintptr(unsafe.Pointer(obj))
 	var errors ValidationErrors
 
-	// 为了保证验证顺序（尤其是 FailFast 模式下的一致性），我们需要对 offset 进行排序
-	// map 的遍历顺序是随机的
-	var offsets []uintptr
-	for offset := range schema.FieldRules {
-		offsets = append(offsets, offset)
-	}
-	sort.Slice(offsets, func(i, j int) bool {
-		return offsets[i] < offsets[j]
-	})
-
-	for _, offset := range offsets {
+	// 使用预先计算好的有序 offsets，避免每次排序的分配
+	for _, offset := range schema.OrderedOffsets {
 		rules := schema.FieldRules[offset]
 		fieldName := schema.FieldNames[offset]
 		if fieldName == "" {
@@ -53,7 +51,7 @@ func Validate[T any](obj *T) ValidationErrors {
 		kind := schema.FieldKinds[offset]
 
 		// 获取字段类型，用于特殊判断（如 Slice 类型或 Time 类型）
-		fieldType := schema.Type.Field(getFieldIdxByOffset(schema.Type, offset)).Type
+		fieldType := schema.FieldTypes[offset]
 
 		for _, rule := range rules {
 			// nolint:govet
@@ -90,6 +88,7 @@ func Validate[T any](obj *T) ValidationErrors {
 
 // 辅助函数：通过 offset 查找字段索引（用于获取字段详细 Type 信息）
 // 这只是一个简单的线性查找，对于大型结构体可能需要优化
+// Deprecated: 使用 schema.FieldTypes 直接获取类型
 func getFieldIdxByOffset(t reflect.Type, offset uintptr) int {
 	for i := 0; i < t.NumField(); i++ {
 		if t.Field(i).Offset == offset {
@@ -125,9 +124,9 @@ func checkRule(ptr unsafe.Pointer, kind reflect.Kind, rule Rule, fieldType refle
 		return checkBoolRule(val, rule)
 	case reflect.Slice:
 		// 切片类型处理
-		// 对于普通长度检查，使用 SliceHeader
+		// 对于普通长度检查，使用 sliceHeader
 		if rule.Type == "min_len" || rule.Type == "max_len" || rule.Type == "len" || rule.Type == "range_len" || rule.Type == "required" {
-			header := (*reflect.SliceHeader)(ptr)
+			header := (*sliceHeader)(ptr)
 			return checkSliceRule(header.Len, rule)
 		}
 		// 对于 Unique 等需要访问元素值的规则，需要 reflect
@@ -141,7 +140,7 @@ func checkRule(ptr unsafe.Pointer, kind reflect.Kind, rule Rule, fieldType refle
 		case "min", "max", "range":
 			// 默认按 int64 尝试
 			return checkInt64Rule(getInt64Value(ptr, kind), rule)
-		case "min_len", "max_len", "len", "range_len", "email", "pattern", "alpha", "alphanum", "numeric", "uppercase", "lowercase", "contains", "startswith", "endswith", "url", "ip", "uuid":
+		case "min_len", "max_len", "len", "range_len", "email", "regex", "alpha", "alphanum", "numeric", "uppercase", "lowercase", "contains", "startswith", "endswith", "url", "ip", "uuid":
 			val := *(*string)(ptr)
 			return checkStringRule(val, rule)
 		case "required":
@@ -427,11 +426,11 @@ func checkStringRule(val string, rule Rule) error {
 		if val != "" && !uuidRegex.MatchString(val) {
 			return fmt.Errorf("invalid uuid format")
 		}
-	case "pattern":
+	case "regex":
 		pat := rule.Params[0].(string)
 		matched, _ := regexp.MatchString(pat, val)
 		if !matched {
-			return fmt.Errorf("must match pattern %s", pat)
+			return fmt.Errorf("must match regex %s", pat)
 		}
 	case "alpha":
 		for _, r := range val {
