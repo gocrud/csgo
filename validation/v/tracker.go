@@ -54,15 +54,15 @@ func (t *fieldTracker) setLastMessage(fieldPath string, msg string) {
 func buildTrackedInstance[T any](tracker *fieldTracker) T {
 	var zero T
 	typ := reflect.TypeOf(zero)
-	
+
 	// 如果是指针类型，获取其元素类型
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 	}
-	
+
 	// 创建值
 	val := buildTrackedValue(typ, "", tracker)
-	
+
 	return val.Interface().(T)
 }
 
@@ -80,33 +80,33 @@ func buildTrackedValue(typ reflect.Type, pathPrefix string, tracker *fieldTracke
 // buildTrackedStruct 构建带追踪的结构体
 func buildTrackedStruct(typ reflect.Type, pathPrefix string, tracker *fieldTracker) reflect.Value {
 	val := reflect.New(typ).Elem()
-	
+
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		fieldType := field.Type
-		
+
 		// 跳过未导出的字段
 		if !field.IsExported() {
 			continue
 		}
-		
+
 		// 获取字段名（优先使用 json tag，否则使用字段名）
 		fieldName := getFieldName(field)
-		
+
 		// 构建字段路径
 		fieldPath := fieldName
 		if pathPrefix != "" {
 			fieldPath = pathPrefix + "." + fieldName
 		}
-		
+
 		// 根据字段类型创建对应的包装类型
 		fieldValue := createWrappedField(fieldType, fieldPath, tracker)
-		
+
 		if fieldValue.IsValid() {
 			val.Field(i).Set(fieldValue)
 		}
 	}
-	
+
 	return val
 }
 
@@ -114,35 +114,35 @@ func buildTrackedStruct(typ reflect.Type, pathPrefix string, tracker *fieldTrack
 func createWrappedField(fieldType reflect.Type, fieldPath string, tracker *fieldTracker) reflect.Value {
 	// 检查是否是我们的包装类型
 	typeName := fieldType.String()
-	
+
 	switch typeName {
 	case "v.String":
 		str := newString("", fieldPath, tracker)
 		return reflect.ValueOf(str)
-		
+
 	case "v.Int":
 		i := newInt(0, fieldPath, tracker)
 		return reflect.ValueOf(i)
-		
+
 	case "v.Int64":
 		i := newInt64(0, fieldPath, tracker)
 		return reflect.ValueOf(i)
-		
+
 	case "v.Float64":
 		f := newFloat64(0, fieldPath, tracker)
 		return reflect.ValueOf(f)
-		
+
 	case "v.Bool":
 		b := newBool(false, fieldPath, tracker)
 		return reflect.ValueOf(b)
 	}
-	
+
 	// 检查是否是 Slice 类型
 	if strings.HasPrefix(typeName, "v.Slice[") {
 		// 创建一个空的 Slice 实例
 		// 由于泛型的限制，这里需要通过反射创建
 		val := reflect.New(fieldType).Elem()
-		
+
 		// 设置 fieldPath 和 tracker
 		// 通过反射设置私有字段
 		if val.NumField() >= 3 {
@@ -155,7 +155,7 @@ func createWrappedField(fieldType reflect.Type, fieldPath string, tracker *field
 				reflect.NewAt(fieldPathField.Type(), fieldPathField.Addr().UnsafePointer()).
 					Elem().SetString(fieldPath)
 			}
-			
+
 			// tracker 字段（索引 2）
 			trackerField := val.Field(2)
 			if trackerField.CanSet() {
@@ -165,15 +165,15 @@ func createWrappedField(fieldType reflect.Type, fieldPath string, tracker *field
 					Elem().Set(reflect.ValueOf(tracker))
 			}
 		}
-		
+
 		return val
 	}
-	
+
 	// 如果是嵌套结构体，递归处理
 	if fieldType.Kind() == reflect.Struct {
 		return buildTrackedStruct(fieldType, fieldPath, tracker)
 	}
-	
+
 	// 其他类型返回零值
 	return reflect.Zero(fieldType)
 }
@@ -190,7 +190,7 @@ func getFieldName(field reflect.StructField) string {
 			return parts[0]
 		}
 	}
-	
+
 	// 如果没有 json tag，使用字段名并转换为小驼峰
 	return toLowerCamelCase(field.Name)
 }

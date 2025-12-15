@@ -21,7 +21,7 @@ func (r *sliceMinLenRule) ValidateSlice(value interface{}) error {
 	if v.Kind() != reflect.Slice {
 		return fmt.Errorf("期望切片类型")
 	}
-	
+
 	length := v.Len()
 	if length < r.Min {
 		if r.Message != "" {
@@ -55,7 +55,7 @@ func (r *sliceMaxLenRule) ValidateSlice(value interface{}) error {
 	if v.Kind() != reflect.Slice {
 		return fmt.Errorf("期望切片类型")
 	}
-	
+
 	length := v.Len()
 	if length > r.Max {
 		if r.Message != "" {
@@ -88,7 +88,7 @@ func (r *sliceNotEmptyRule) ValidateSlice(value interface{}) error {
 	if v.Kind() != reflect.Slice {
 		return fmt.Errorf("期望切片类型")
 	}
-	
+
 	if v.Len() == 0 {
 		if r.Message != "" {
 			return fmt.Errorf("%s", r.Message)
