@@ -252,6 +252,11 @@ func (s *Slice[T]) Len(len int) *Slice[T] {
 	return s
 }
 
+func (s *Slice[T]) RangeLen(min, max int) *Slice[T] {
+	validation.RecordRule(unsafe.Pointer(s), "range_len", min, max)
+	return s
+}
+
 func (s *Slice[T]) Required() *Slice[T] {
 	validation.RecordRule(unsafe.Pointer(s), "required")
 	return s

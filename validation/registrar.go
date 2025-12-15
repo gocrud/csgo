@@ -130,7 +130,7 @@ func mapOffsetsToNames(t reflect.Type, baseOffset uintptr, prefix string, schema
 		schema.FieldKinds[absoluteOffset] = field.Type.Kind()
 
 		// 递归处理嵌套结构体
-		// 注意：我们要避开 v.Int, v.String 这种虽然底层是 int/string 但在反射中可能表现为 Named Type 的情况
+		// 注意：要避开 v.Int, v.String 这种虽然底层是 int/string 但在反射中可能表现为 Named Type 的情况
 		// 实际上 v.Int 的 Kind 是 Int，不会进这个 if (除非定义为 struct)
 		// 只有真正的 struct 字段才需要递归
 		if field.Type.Kind() == reflect.Struct {

@@ -126,7 +126,7 @@ func checkRule(ptr unsafe.Pointer, kind reflect.Kind, rule Rule, fieldType refle
 	case reflect.Slice:
 		// 切片类型处理
 		// 对于普通长度检查，使用 SliceHeader
-		if rule.Type == "min_len" || rule.Type == "max_len" || rule.Type == "len" || rule.Type == "required" {
+		if rule.Type == "min_len" || rule.Type == "max_len" || rule.Type == "len" || rule.Type == "range_len" || rule.Type == "required" {
 			header := (*reflect.SliceHeader)(ptr)
 			return checkSliceRule(header.Len, rule)
 		}
@@ -141,7 +141,7 @@ func checkRule(ptr unsafe.Pointer, kind reflect.Kind, rule Rule, fieldType refle
 		case "min", "max", "range":
 			// 默认按 int64 尝试
 			return checkInt64Rule(getInt64Value(ptr, kind), rule)
-		case "min_len", "max_len", "len", "email", "pattern", "alpha", "alphanum", "numeric", "uppercase", "lowercase", "contains", "startswith", "endswith", "url", "ip", "uuid":
+		case "min_len", "max_len", "len", "range_len", "email", "pattern", "alpha", "alphanum", "numeric", "uppercase", "lowercase", "contains", "startswith", "endswith", "url", "ip", "uuid":
 			val := *(*string)(ptr)
 			return checkStringRule(val, rule)
 		case "required":
@@ -178,6 +178,12 @@ func checkSliceRule(length int, rule Rule) error {
 		l := rule.Params[0].(int)
 		if length != l {
 			return fmt.Errorf("length must be %d", l)
+		}
+	case "range_len":
+		min := rule.Params[0].(int)
+		max := rule.Params[1].(int)
+		if length < min || length > max {
+			return fmt.Errorf("length must be between %d and %d", min, max)
 		}
 	}
 	return nil
@@ -395,6 +401,12 @@ func checkStringRule(val string, rule Rule) error {
 		l := rule.Params[0].(int)
 		if len(val) != l {
 			return fmt.Errorf("length must be %d", l)
+		}
+	case "range_len":
+		min := rule.Params[0].(int)
+		max := rule.Params[1].(int)
+		if len(val) < min || len(val) > max {
+			return fmt.Errorf("length must be between %d and %d", min, max)
 		}
 	case "email":
 		if val != "" && !emailRegex.MatchString(val) {

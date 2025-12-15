@@ -70,6 +70,11 @@ func (s *String) Len(len int) *String {
 	return s
 }
 
+func (s *String) RangeLen(min, max int) *String {
+	validation.RecordRule(unsafe.Pointer(s), "range_len", min, max)
+	return s
+}
+
 func (s *String) Required() *String {
 	validation.RecordRule(unsafe.Pointer(s), "required")
 	return s
