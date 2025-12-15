@@ -10,7 +10,6 @@ import (
 	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/errors"
 	"github.com/gocrud/csgo/validation"
-	v "github.com/gocrud/csgo/validation/v"
 )
 
 // HttpContext wraps gin.Context and provides unified API for HTTP handling.
@@ -231,11 +230,11 @@ func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
 		return nil, c.BadRequest(err.Error())
 	}
 
-	// 2. 使用新验证器执行验证（validation/v）
-	result := v.Validate(&target)
-	if !result.IsValid {
+	// 2. 使用新验证器执行验证
+	errs := validation.Validate(&target)
+	if errs != nil && errs.HasErrors() {
 		// 返回结构化的验证错误
-		return nil, c.ValidationBadRequest(result.Errors)
+		return nil, c.ValidationBadRequest(errs)
 	}
 
 	// 3. 如果实现了 Validator 接口，也调用
