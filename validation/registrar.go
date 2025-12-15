@@ -98,6 +98,30 @@ func SetLastRuleMsg(fieldPtr unsafe.Pointer, msg string) {
 	}
 }
 
+// SetGroupMsg 设置一组规则的自定义消息
+// 它会从最后一条规则开始向前遍历，直到遇到已经有自定义消息的规则为止
+// 将这期间的所有规则的 CustomMsg 设置为 msg
+func SetGroupMsg(fieldPtr unsafe.Pointer, msg string) {
+	if currentRecorder == nil {
+		return
+	}
+
+	offset := uintptr(fieldPtr) - currentRecorder.BasePtr
+	rules := currentRecorder.Rules[offset]
+	if len(rules) == 0 {
+		return
+	}
+
+	// 从后往前遍历，直到遇到已设置消息的规则
+	for i := len(rules) - 1; i >= 0; i-- {
+		if rules[i].CustomMsg != "" {
+			break
+		}
+		rules[i].CustomMsg = msg
+	}
+	currentRecorder.Rules[offset] = rules
+}
+
 // mapOffsetsToNames 递归解析结构体字段
 // baseOffset: 当前结构体相对于根结构体的偏移量
 // prefix: 字段名前缀 (如 "user.address.")
