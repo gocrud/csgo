@@ -9,15 +9,15 @@ import (
 	"github.com/gocrud/csgo/di/internal"
 )
 
-// IServiceProvider defines the mechanism for retrieving service objects.
+// IServiceProvider 定义检索服务对象的机制。
 type IServiceProvider interface {
-	// Get retrieves a service and populates it into the target pointer (panics if not found).
-	// Supports both pointer and value types with automatic dereferencing:
-	//   - var svc *UserService; provider.Get(&svc)  // pointer type (zero-copy)
-	//   - var svc UserService; provider.Get(&svc)   // value type (auto-deref + copy)
+	// Get 检索服务并将其填充到目标指针中（如果未找到则 panic）。
+	// 支持自动解引用的指针和值类型：
+	//   - var svc *UserService; provider.Get(&svc)  // 指针类型（零拷贝）
+	//   - var svc UserService; provider.Get(&svc)   // 值类型（自动解引用 + 拷贝）
 	Get(target interface{})
 
-	// GetNamed retrieves a named service and populates it into the target pointer (panics if not found).
+	// GetNamed 检索命名服务并将其填充到目标指针中（如果未找到则 panic）。
 	//   - var db *Database; provider.GetNamed(&db, "primary")
 	GetNamed(target interface{}, serviceKey string)
 
@@ -26,18 +26,18 @@ type IServiceProvider interface {
 	resolveNamed(t reflect.Type, name string) (interface{}, error)
 	resolveAll(t reflect.Type) []interface{}
 
-	// Dispose releases all resources.
+	// Dispose 释放所有资源。
 	Dispose() error
 }
 
-// serviceProvider is the concrete implementation of IServiceProvider.
+// serviceProvider 是 IServiceProvider 的具体实现。
 type serviceProvider struct {
 	engine   *internal.Engine
 	disposed atomic.Bool
 }
 
-// Get retrieves a service and populates it into the target pointer.
-// Supports both pointer and value types with intelligent dereferencing.
+// Get 检索服务并将其填充到目标指针中。
+// 支持具有智能解引用的指针和值类型。
 func (p *serviceProvider) Get(target interface{}) {
 	if p.disposed.Load() {
 		panic("service provider is disposed")
@@ -51,19 +51,19 @@ func (p *serviceProvider) Get(target interface{}) {
 	elem := val.Elem()
 	elemType := elem.Type()
 
-	// Try 1: Direct lookup for the target type
+	// 尝试 1：直接查找目标类型
 	service, err := p.engine.Resolve(elemType, "")
 	if err == nil {
 		elem.Set(reflect.ValueOf(service))
 		return
 	}
 
-	// Try 2: If target is a value type (struct), try to find pointer type and auto-deref
+	// 尝试 2：如果目标是值类型（结构体），尝试查找指针类型并自动解引用
 	if elemType.Kind() == reflect.Struct {
 		ptrType := reflect.PointerTo(elemType)
 		ptrService, ptrErr := p.engine.Resolve(ptrType, "")
 		if ptrErr == nil {
-			// Auto-dereference: assign copy of the value
+			// 自动解引用：赋值值的副本
 			elem.Set(reflect.ValueOf(ptrService).Elem())
 			return
 		}
@@ -72,7 +72,7 @@ func (p *serviceProvider) Get(target interface{}) {
 	panic(fmt.Sprintf("service %v not found", elemType))
 }
 
-// GetNamed retrieves a named service and populates it into the target pointer.
+// GetNamed 检索命名服务并将其填充到目标指针中。
 func (p *serviceProvider) GetNamed(target interface{}, serviceKey string) {
 	if p.disposed.Load() {
 		panic("service provider is disposed")
@@ -86,14 +86,14 @@ func (p *serviceProvider) GetNamed(target interface{}, serviceKey string) {
 	elem := val.Elem()
 	elemType := elem.Type()
 
-	// Try 1: Direct lookup
+	// 尝试 1：直接查找
 	service, err := p.engine.Resolve(elemType, serviceKey)
 	if err == nil {
 		elem.Set(reflect.ValueOf(service))
 		return
 	}
 
-	// Try 2: Auto-deref for value types
+	// 尝试 2：对于值类型的自动解引用
 	if elemType.Kind() == reflect.Struct {
 		ptrType := reflect.PointerTo(elemType)
 		ptrService, ptrErr := p.engine.Resolve(ptrType, serviceKey)
@@ -106,7 +106,7 @@ func (p *serviceProvider) GetNamed(target interface{}, serviceKey string) {
 	panic(fmt.Sprintf("named service %v[%s] not found", elemType, serviceKey))
 }
 
-// resolveType resolves a service by type (internal method for generic API).
+// resolveType 按类型解析服务（泛型 API 的内部方法）。
 func (p *serviceProvider) resolveType(t reflect.Type) (interface{}, error) {
 	if p.disposed.Load() {
 		return nil, errors.New("provider disposed")
@@ -114,7 +114,7 @@ func (p *serviceProvider) resolveType(t reflect.Type) (interface{}, error) {
 	return p.engine.Resolve(t, "")
 }
 
-// resolveNamed resolves a named service by type (internal method for generic API).
+// resolveNamed 按类型解析命名服务（泛型 API 的内部方法）。
 func (p *serviceProvider) resolveNamed(t reflect.Type, name string) (interface{}, error) {
 	if p.disposed.Load() {
 		return nil, errors.New("provider disposed")
@@ -122,7 +122,7 @@ func (p *serviceProvider) resolveNamed(t reflect.Type, name string) (interface{}
 	return p.engine.Resolve(t, name)
 }
 
-// resolveAll resolves all services of a type (internal method for generic API).
+// resolveAll 解析特定类型的所有服务（泛型 API 的内部方法）。
 func (p *serviceProvider) resolveAll(t reflect.Type) []interface{} {
 	if p.disposed.Load() {
 		return nil
@@ -131,18 +131,18 @@ func (p *serviceProvider) resolveAll(t reflect.Type) []interface{} {
 	return services
 }
 
-// Dispose releases all resources including singleton services.
-// All singleton services implementing IDisposable will have their Dispose method called.
+// Dispose 释放所有资源，包括单例服务。
+// 所有实现 IDisposable 的单例服务都将调用其 Dispose 方法。
 func (p *serviceProvider) Dispose() error {
 	if !p.disposed.CompareAndSwap(false, true) {
 		return nil // Already disposed
 	}
 
-	// Dispose all singleton services implementing IDisposable
+	// 释放所有实现 IDisposable 的单例服务
 	singletons := p.engine.GetSingletons()
 	var errors []error
 
-	// Dispose in reverse order (LIFO)
+	// 按相反顺序释放（LIFO）
 	for i := len(singletons) - 1; i >= 0; i-- {
 		if disposable, ok := singletons[i].(IDisposable); ok {
 			if err := disposable.Dispose(); err != nil {

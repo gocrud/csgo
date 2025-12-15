@@ -9,7 +9,7 @@ import (
 )
 
 // ServiceLifetime 服务生命周期
-// 简化版本只支持Singleton
+// 简化版本只支持 Singleton
 type ServiceLifetime int
 
 const (
@@ -24,11 +24,11 @@ type RegistrationKey struct {
 
 // Registration 注册信息
 type Registration struct {
-	ID                 TypeID // Cached TypeID for performance
+	ID                 TypeID // 缓存 TypeID 以提高性能
 	ServiceType        reflect.Type
 	ImplementationType reflect.Type
 	Lifetime           ServiceLifetime
-	ServiceKey         string // For Keyed Services
+	ServiceKey         string // 用于键控服务 (Keyed Services)
 	Factory            interface{}
 	FactoryValue       reflect.Value
 	InputTypes         []reflect.Type
@@ -85,7 +85,7 @@ func (e *Engine) Register(reg *Registration) error {
 	reg.FactoryValue = reflect.ValueOf(reg.Factory)
 
 	// 注册到 map
-	// 使用提供的 Name（用于 Keyed Services）
+	// 使用提供的 Name（用于键控服务 Keyed Services）
 	key := RegistrationKey{Type: reg.ServiceType, Name: reg.ServiceKey}
 	e.registrations[key] = reg
 
@@ -126,7 +126,7 @@ func (e *Engine) RegisterKeyed(reg *Registration, serviceKey string) error {
 	// 缓存 reflect.Value
 	reg.FactoryValue = reflect.ValueOf(reg.Factory)
 
-	// 注册到 map with service key
+	// 使用服务键注册到 map
 	key := RegistrationKey{Type: reg.ServiceType, Name: serviceKey}
 	e.registrations[key] = reg
 
@@ -157,7 +157,7 @@ func (e *Engine) Compile() error {
 	for _, key := range sorted {
 		reg := e.registrations[key]
 		if reg != nil {
-			// Cache TypeID for performance
+			// 缓存 TypeID 以提高性能
 			reg.ID = e.registry.GetID(key.Type, key.Name)
 
 			if reg.Lifetime == Singleton {
@@ -174,7 +174,7 @@ func (e *Engine) Compile() error {
 	return nil
 }
 
-// Resolve 解析服务（只支持Singleton）
+// Resolve 解析服务（只支持 Singleton）
 func (e *Engine) Resolve(serviceType reflect.Type, name string) (interface{}, error) {
 	return e.resolveInternal(serviceType, name, []string{})
 }
@@ -188,19 +188,19 @@ func (e *Engine) resolveInternal(serviceType reflect.Type, name string, chain []
 
 	reg, exists := e.registrations[key]
 	if !exists {
-		// Only format the tree if we're actually failing here
+		// 只有在真正失败时才格式化依赖树
 		tree := formatDependencyTree(chain, formatType(serviceType))
 		return nil, fmt.Errorf("service '%s' not found:%s\n  Cause: service not registered",
 			formatType(serviceType), tree)
 	}
 
-	// All services are Singleton - retrieve from pre-compiled cache
-	// Use cached ID to avoid registry lock
+	// 所有服务都是 Singleton - 从预编译缓存中检索
+	// 使用缓存的 ID 避免注册表锁
 	singletons := e.singletons.Load().([]interface{})
 	return singletons[int(reg.ID)], nil
 }
 
-// formatDependencyTree formats the dependency chain into a tree structure
+// formatDependencyTree 将依赖链格式化为树状结构
 func formatDependencyTree(chain []string, current string) string {
 	if len(chain) == 0 {
 		return fmt.Sprintf("\n  └─ ❌ %s", current)
@@ -219,13 +219,13 @@ func formatDependencyTree(chain []string, current string) string {
 	return builder
 }
 
-// formatType returns a fully qualified type name
+// formatType 返回完全限定的类型名称
 func formatType(t reflect.Type) string {
 	if t == nil {
 		return "nil"
 	}
 
-	// Handle pointers recursively
+	// 递归处理指针
 	if t.Kind() == reflect.Ptr {
 		return "*" + formatType(t.Elem())
 	}
@@ -236,7 +236,7 @@ func formatType(t reflect.Type) string {
 	return t.PkgPath() + "." + t.Name()
 }
 
-// ResolveAll 解析所有服务
+// ResolveAll 解析特定类型的所有服务
 func (e *Engine) ResolveAll(serviceType reflect.Type) ([]interface{}, error) {
 	if !e.compiled.Load() {
 		return nil, errors.New("engine not compiled")
@@ -261,7 +261,7 @@ func (e *Engine) ResolveAll(serviceType reflect.Type) ([]interface{}, error) {
 
 // createInstance 创建实例
 func (e *Engine) createInstance(reg *Registration, chain []string) (interface{}, error) {
-	// Add current service to chain
+	// 将当前服务添加到链中
 	currentType := formatType(reg.ServiceType)
 	newChain := append(chain, currentType)
 
@@ -277,22 +277,22 @@ func (e *Engine) createInstance(reg *Registration, chain []string) (interface{},
 			dep, err = e.resolveDuringCompile(depType, "", newChain)
 		} else {
 			// 运行时解析
-			// Note: At runtime, ResolveInternal only returns singletons.
-			// Ideally we shouldn't be calling createInstance at runtime for Singletons if they are pre-created.
-			// But if we support transient/scoped in future, this path is needed.
-			// Current implementation only supports Singleton and pre-creates them.
-			// However, Resolve calls resolveInternal which does lookup.
+			// 注意：在运行时，ResolveInternal 仅返回单例。
+			// 理想情况下，如果单例已预先创建，我们不应在运行时调用 createInstance。
+			// 但如果将来支持 transient/scoped，则需要此路径。
+			// 当前实现仅支持 Singleton 并预先创建它们。
+			// 但是，Resolve 调用 resolveInternal，后者进行查找。
 			dep, err = e.resolveInternal(depType, "", newChain)
 		}
 
 		if err != nil {
-			// If it's already our formatted error, just wrap it or return it
-			// But we want to ensure the chain is preserved if the error came from deep down
-			// Actually, the error from deep down already has the tree.
-			// We might just want to prepend our info if needed, but usually the deep error is enough.
-			// However, to match the tree structure, the deep error has the full tree from ITS perspective.
-			// If we want to show the full tree from ROOT, we rely on the chain being passed down.
-			// The error returned from recursive call ALREADY has the full tree because we passed 'newChain'.
+			// 如果已经是我们格式化的错误，只需包装或返回它
+			// 但我们希望确保链被保留，如果错误来自深层
+			// 实际上，深层的错误已经包含了树。
+			// 我们可能只想在需要时添加我们的信息，但通常深层错误就足够了。
+			// 但是，为了匹配树结构，深层错误具有从它的视角看的完整树。
+			// 如果我们想显示从 ROOT 开始的完整树，我们依赖于向下传递的 chain。
+			// 从递归调用返回的错误已经具有完整的树，因为我们传递了 'newChain'。
 			return nil, err
 		}
 		args[i] = reflect.ValueOf(dep)
@@ -324,9 +324,9 @@ func (e *Engine) resolveDuringCompile(serviceType reflect.Type, name string, cha
 	if reg.Lifetime == Singleton {
 		singletons := e.singletons.Load()
 		if singletons != nil {
-			// Use cached ID if available, otherwise fallback (though Compile sets it)
+			// 如果可用，使用缓存的 ID，否则回退（尽管 Compile 会设置它）
 			id := reg.ID
-			if id == 0 { // Just in case it wasn't set yet (circular dep check handles order)
+			if id == 0 { // 以防万一尚未设置（循环依赖检查处理顺序）
 				id = e.registry.GetID(key.Type, key.Name)
 			}
 

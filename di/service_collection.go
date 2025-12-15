@@ -7,43 +7,43 @@ import (
 	"github.com/gocrud/csgo/di/internal"
 )
 
-// IServiceCollection is a contract for a collection of service descriptors.
-// This is a pure registration interface following the Interface Segregation Principle.
-// Build, Count, and GetDescriptors methods are available on the concrete type but not in the interface.
+// IServiceCollection 是服务描述符集合的契约。
+// 这是一个遵循接口隔离原则的纯注册接口。
+// Build、Count 和 GetDescriptors 方法在具体类型上可用，但不在接口中。
 type IServiceCollection interface {
-	// Add registers a singleton service using a constructor function.
+	// Add 使用构造函数注册单例服务。
 	Add(constructor interface{}) IServiceCollection
 
-	// AddInstance registers a singleton instance (pre-created object).
+	// AddInstance 注册单例实例（预先创建的对象）。
 	AddInstance(instance interface{}) IServiceCollection
 
-	// AddNamed registers a named singleton service.
+	// AddNamed 注册命名单例服务。
 	AddNamed(name string, constructor interface{}) IServiceCollection
 
-	// TryAdd attempts to add a singleton service if it doesn't exist.
+	// TryAdd 尝试添加单例服务（如果不存在）。
 	TryAdd(constructor interface{}) IServiceCollection
 
-	// AddHostedService registers a hosted service (background service).
+	// AddHostedService 注册托管服务（后台服务）。
 	AddHostedService(constructor interface{}) IServiceCollection
 }
 
-// serviceCollection is the concrete implementation of IServiceCollection.
+// serviceCollection 是 IServiceCollection 的具体实现。
 type serviceCollection struct {
 	engine *internal.Engine
 }
 
-// NewServiceCollection creates a new service collection.
+// NewServiceCollection 创建一个新的服务集合。
 func NewServiceCollection() IServiceCollection {
 	return &serviceCollection{
 		engine: internal.NewEngine(),
 	}
 }
 
-// BuildServiceProvider builds the service provider from a service collection.
-// This function allows building from the interface type.
-// Usage: provider := di.BuildServiceProvider(services)
+// BuildServiceProvider 从服务集合构建服务提供者。
+// 该函数允许从接口类型构建。
+// 用法：provider := di.BuildServiceProvider(services)
 func BuildServiceProvider(services IServiceCollection) IServiceProvider {
-	// Type assert to concrete implementation
+	// 类型断言为具体实现
 	sc, ok := services.(*serviceCollection)
 	if !ok {
 		panic("services must be created by NewServiceCollection")
@@ -52,7 +52,7 @@ func BuildServiceProvider(services IServiceCollection) IServiceProvider {
 	return sc.Build()
 }
 
-// Add registers a singleton service using a constructor function.
+// Add 使用构造函数注册单例服务。
 func (s *serviceCollection) Add(constructor interface{}) IServiceCollection {
 	if err := s.register(constructor, Singleton); err != nil {
 		panic(fmt.Sprintf("failed to register service: %v", err))
@@ -60,7 +60,7 @@ func (s *serviceCollection) Add(constructor interface{}) IServiceCollection {
 	return s
 }
 
-// TryAdd attempts to add a singleton if it doesn't exist.
+// TryAdd 尝试添加单例（如果不存在）。
 func (s *serviceCollection) TryAdd(constructor interface{}) IServiceCollection {
 	ctorType := reflect.TypeOf(constructor)
 	if ctorType.Kind() != reflect.Func {
@@ -77,7 +77,7 @@ func (s *serviceCollection) TryAdd(constructor interface{}) IServiceCollection {
 	return s
 }
 
-// AddInstance registers a singleton instance (pre-created object).
+// AddInstance 注册单例实例（预先创建的对象）。
 func (s *serviceCollection) AddInstance(instance interface{}) IServiceCollection {
 	if instance == nil {
 		panic("instance cannot be nil")
@@ -85,8 +85,8 @@ func (s *serviceCollection) AddInstance(instance interface{}) IServiceCollection
 
 	instanceType := reflect.TypeOf(instance)
 
-	// Create a properly typed constructor using reflection
-	// This ensures Register() correctly extracts the type
+	// 使用反射创建类型正确的构造函数
+	// 这确保 Register() 正确提取类型
 	factoryType := reflect.FuncOf([]reflect.Type{}, []reflect.Type{instanceType}, false)
 	factoryValue := reflect.MakeFunc(factoryType, func(args []reflect.Value) []reflect.Value {
 		return []reflect.Value{reflect.ValueOf(instance)}
@@ -106,14 +106,14 @@ func (s *serviceCollection) AddInstance(instance interface{}) IServiceCollection
 	return s
 }
 
-// AddHostedService registers a hosted service.
-// The service will be started when the host starts and stopped when the host stops.
+// AddHostedService 注册托管服务。
+// 该服务将在主机启动时启动，在主机停止时停止。
 func (s *serviceCollection) AddHostedService(constructor interface{}) IServiceCollection {
-	// Register as Singleton (hosted services should be singletons)
+	// 注册为 Singleton（托管服务应该是单例）
 	return s.Add(constructor)
 }
 
-// AddNamed registers a named singleton service.
+// AddNamed 注册命名单例服务。
 func (s *serviceCollection) AddNamed(name string, constructor interface{}) IServiceCollection {
 	if err := s.registerKeyed(constructor, Singleton, name); err != nil {
 		panic(fmt.Sprintf("failed to register named service: %v", err))
@@ -121,9 +121,9 @@ func (s *serviceCollection) AddNamed(name string, constructor interface{}) IServ
 	return s
 }
 
-// Build builds the service provider.
-// This is a convenience method on the concrete type (not in the interface).
-// Usage: provider := services.Build()
+// Build 构建服务提供者。
+// 这是具体类型上的便捷方法（不在接口中）。
+// 用法：provider := services.Build()
 func (s *serviceCollection) Build() IServiceProvider {
 	provider := &serviceProvider{
 		engine: s.engine,
@@ -136,15 +136,15 @@ func (s *serviceCollection) Build() IServiceProvider {
 	return provider
 }
 
-// Count returns the number of registered services.
-// This is a diagnostic method on the concrete type (not in the interface).
+// Count 返回已注册服务的数量。
+// 这是具体类型上的诊断方法（不在接口中）。
 func (s *serviceCollection) Count() int {
 	registrations := s.engine.GetAllRegistrations()
 	return len(registrations)
 }
 
-// GetDescriptors returns all service descriptors.
-// This is a diagnostic method on the concrete type (not in the interface).
+// GetDescriptors 返回所有服务描述符。
+// 这是具体类型上的诊断方法（不在接口中）。
 func (s *serviceCollection) GetDescriptors() []ServiceDescriptor {
 	registrations := s.engine.GetAllRegistrations()
 	descriptors := make([]ServiceDescriptor, 0, len(registrations))
@@ -153,7 +153,7 @@ func (s *serviceCollection) GetDescriptors() []ServiceDescriptor {
 		descriptor := ServiceDescriptor{
 			ServiceType:        reg.ServiceType,
 			ImplementationType: reg.ImplementationType,
-			Lifetime:           Singleton, // All services are Singleton now
+			Lifetime:           Singleton, // 现在所有服务都是 Singleton
 			ServiceKey:         key.Name,
 		}
 		descriptors = append(descriptors, descriptor)
@@ -162,7 +162,7 @@ func (s *serviceCollection) GetDescriptors() []ServiceDescriptor {
 	return descriptors
 }
 
-// register is a helper to register a singleton service.
+// register 是注册单例服务的辅助函数。
 func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLifetime) error {
 	if constructor == nil {
 		return fmt.Errorf("constructor cannot be nil")
@@ -196,7 +196,7 @@ func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLi
 	return s.engine.Register(reg)
 }
 
-// registerKeyed is a helper to register a keyed singleton service.
+// registerKeyed 是注册命名单例服务的辅助函数。
 func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime ServiceLifetime, serviceKey string) error {
 	if constructor == nil {
 		return fmt.Errorf("constructor cannot be nil")
@@ -231,6 +231,6 @@ func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime Serv
 		Factory:            constructor,
 	}
 
-	// Register with the service key in the engine
+	// 在引擎中注册带有服务键的服务
 	return s.engine.RegisterKeyed(reg, serviceKey)
 }

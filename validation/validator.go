@@ -17,8 +17,8 @@ var (
 	uuidRegex  = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 )
 
-// sliceHeader mimics reflect.SliceHeader but without the deprecation warning.
-// It matches the memory layout of a Go slice.
+// sliceHeader 模仿 reflect.SliceHeader，但没有弃用警告。
+// 它匹配 Go 切片的内存布局。
 type sliceHeader struct {
 	Data unsafe.Pointer
 	Len  int
@@ -84,20 +84,6 @@ func Validate[T any](obj *T) ValidationErrors {
 		return errors
 	}
 	return nil
-}
-
-// 辅助函数：通过 offset 查找字段索引（用于获取字段详细 Type 信息）
-// 这只是一个简单的线性查找，对于大型结构体可能需要优化
-// Deprecated: 使用 schema.FieldTypes 直接获取类型
-func getFieldIdxByOffset(t reflect.Type, offset uintptr) int {
-	for i := 0; i < t.NumField(); i++ {
-		if t.Field(i).Offset == offset {
-			return i
-		}
-	}
-	// 递归查找嵌套结构体
-	// ... (省略复杂的递归逻辑，当前假设扁平或者不需要深度 Type 信息)
-	return -1
 }
 
 func checkRule(ptr unsafe.Pointer, kind reflect.Kind, rule Rule, fieldType reflect.Type) error {
