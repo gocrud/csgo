@@ -550,17 +550,17 @@ if err != nil {
 
 ### 业务错误响应
 
+**推荐方式：使用 FromError（简洁）**
+
 ```go
 import "github.com/gocrud/csgo/errors"
 
 func getUser(c *web.HttpContext) web.IActionResult {
     user, err := userService.GetUser(id)
     if err != nil {
-        // 如果是业务错误，自动映射 HTTP 状态码
-        if bizErr, ok := err.(*errors.BizError); ok {
-            return c.BizError(bizErr)
-        }
-        return c.InternalError("服务器错误")
+        // FromError 自动识别错误类型并返回对应的响应
+        // BizError -> 自动映射状态码，ValidationErrors -> 400，普通 error -> 500
+        return c.FromError(err, "获取用户失败")
     }
     return c.Ok(user)
 }
@@ -576,6 +576,48 @@ func (s *UserService) GetUser(id int) (*User, error) {
         return nil, errors.Business("USER").NotFound("用户不存在")
     }
     return user, nil
+}
+```
+
+**传统方式：手动类型判断（仍然支持）**
+
+```go
+func getUser(c *web.HttpContext) web.IActionResult {
+    user, err := userService.GetUser(id)
+    if err != nil {
+        // 手动判断错误类型
+        if bizErr, ok := err.(*errors.BizError); ok {
+            return c.BizError(bizErr)
+        }
+        return c.InternalError("服务器错误")
+    }
+    return c.Ok(user)
+}
+```
+
+**自定义错误处理器**
+
+```go
+// 在应用启动时注册
+func init() {
+    // 注册数据库错误处理器
+    web.RegisterErrorHandler(
+        func(err error) bool {
+            return errors.Is(err, sql.ErrNoRows)
+        },
+        func(err error, msg ...string) web.IActionResult {
+            return web.Error(404, "NOT_FOUND", "记录不存在")
+        },
+    )
+}
+
+// 控制器中使用
+func getUser(c *web.HttpContext) web.IActionResult {
+    user, err := repo.FindByID(id)  // 可能返回 sql.ErrNoRows
+    if err != nil {
+        return c.FromError(err, "用户不存在")  // 自动应用处理器
+    }
+    return c.Ok(user)
 }
 ```
 
@@ -914,6 +956,7 @@ func createUser(c *web.HttpContext) web.IActionResult {
 ### 5. 错误处理分层
 
 ```go
+// ✅ 推荐：服务层抛出业务错误，控制器使用 FromError
 // 服务层：抛出业务错误
 func (s *UserService) GetUser(id int) (*User, error) {
     if user == nil {
@@ -922,12 +965,21 @@ func (s *UserService) GetUser(id int) (*User, error) {
     return user, nil
 }
 
-// 控制器层：转换为 HTTP 响应
+// 控制器层：使用 FromError 自动处理
+func (ctrl *UserController) GetUser(c *web.HttpContext) web.IActionResult {
+    user, err := ctrl.service.GetUser(id)
+    if err != nil {
+        return c.FromError(err, "获取用户失败")  // 一行搞定！
+    }
+    return c.Ok(user)
+}
+
+// ❌ 不推荐：手动类型判断（样板代码多）
 func (ctrl *UserController) GetUser(c *web.HttpContext) web.IActionResult {
     user, err := ctrl.service.GetUser(id)
     if err != nil {
         if bizErr, ok := err.(*errors.BizError); ok {
-            return c.BizError(bizErr)  // 自动映射状态码
+            return c.BizError(bizErr)
         }
         return c.InternalError("服务器错误")
     }

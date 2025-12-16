@@ -255,3 +255,31 @@ func (c *HttpContext) ValidateStruct(target interface{}) IActionResult {
 	// 建议直接使用 BindAndValidate[T] 泛型方法
 	return nil
 }
+
+// ==================== Smart Error Handling ====================
+
+// FromError 智能处理错误，是 web.FromError 的便捷方法
+// 自动识别错误类型并返回对应的 ActionResult
+//
+// 使用示例：
+//
+//	user, err := service.GetUser(id)
+//	if err != nil {
+//	    return c.FromError(err, "获取用户失败")
+//	}
+func (c *HttpContext) FromError(err error, defaultMessage ...string) IActionResult {
+	return FromError(err, defaultMessage...)
+}
+
+// FromErrorWithStatus 智能处理错误并指定状态码
+// 对于普通 error 使用指定的状态码，对于 BizError 和 ValidationErrors 忽略状态码
+//
+// 使用示例：
+//
+//	err := db.Connect()
+//	if err != nil {
+//	    return c.FromErrorWithStatus(err, 503, "数据库服务暂时不可用")
+//	}
+func (c *HttpContext) FromErrorWithStatus(err error, statusCode int, defaultMessage ...string) IActionResult {
+	return FromErrorWithStatus(err, statusCode, defaultMessage...)
+}

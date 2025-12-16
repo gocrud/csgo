@@ -188,13 +188,14 @@ func (s *UserService) SendVerificationEmail(userID int) error {
 
 ## Web 层集成
 
-### 在 Controller 中使用
+### 推荐方式：使用 FromError（简洁优雅）
+
+框架提供了 `FromError` 方法，可以智能识别错误类型并自动返回对应的 HTTP 响应：
 
 ```go
 package controllers
 
 import (
-    "github.com/gin-gonic/gin"
     "github.com/gocrud/csgo/errors"
     "github.com/gocrud/csgo/web"
 )
@@ -203,55 +204,111 @@ type UserController struct {
     userService *UserService
 }
 
-// 示例1：自动映射 HTTP 状态码
-func (ctrl *UserController) GetUser(c *gin.Context) {
-    ctx := web.NewHttpContext(c)
-    
-    id, result := ctx.MustPathInt("id")
-    if result != nil {
-        result.ExecuteResult(c)
-        return
-    }
+// 推荐：使用 FromError 一行搞定所有错误处理
+func (ctrl *UserController) GetUser(c *web.HttpContext) web.IActionResult {
+    id := c.Params().PathInt("id").Value()
     
     user, err := ctrl.userService.GetUser(id)
     if err != nil {
-        // 自动将业务错误转换为合适的 HTTP 状态码
-        // USER.NOT_FOUND -> 404
-        // USER.PERMISSION_DENIED -> 403
-        if bizErr, ok := err.(*errors.BizError); ok {
-            ctx.BizError(bizErr).ExecuteResult(c)
-            return
-        }
-        ctx.InternalError("服务器错误").ExecuteResult(c)
-        return
+        // FromError 会自动识别错误类型：
+        // - BizError: 自动映射 HTTP 状态码（NOT_FOUND -> 404）
+        // - ValidationErrors: 返回 400 验证错误
+        // - 普通 error: 返回 500 + 自定义消息
+        return c.FromError(err, "获取用户失败")
     }
     
-    ctx.Ok(user).ExecuteResult(c)
+    return c.Ok(user)
 }
 
-// 示例2：指定 HTTP 状态码
-func (ctrl *UserController) CreateUser(c *gin.Context) {
-    ctx := web.NewHttpContext(c)
-    
-    // 自动绑定并验证（使用注册的验证器）
-    req, result := web.BindAndValidate[CreateUserRequest](ctx)
+func (ctrl *UserController) CreateUser(c *web.HttpContext) web.IActionResult {
+    req, result := web.BindAndValidate[CreateUserRequest](c)
     if result != nil {
-        result.ExecuteResult(c)
-        return
+        return result
     }
     
     user, err := ctrl.userService.CreateUser(req)
     if err != nil {
-        if bizErr, ok := err.(*errors.BizError); ok {
-            // 手动指定状态码（如果自动映射不满足需求）
-            ctx.BizErrorWithStatus(400, bizErr).ExecuteResult(c)
-            return
-        }
-        ctx.InternalError("创建用户失败").ExecuteResult(c)
-        return
+        return c.FromError(err, "创建用户失败")  // 一行搞定！
     }
     
-    ctx.Created(user).ExecuteResult(c)
+    return c.Created(user)
+}
+
+// 指定状态码（用于特殊场景）
+func (ctrl *UserController) ConnectDatabase(c *web.HttpContext) web.IActionResult {
+    err := ctrl.service.Connect()
+    if err != nil {
+        // 数据库连接错误返回 503
+        return c.FromErrorWithStatus(err, 503, "数据库服务暂时不可用")
+    }
+    return c.Ok(nil)
+}
+```
+
+### 传统方式：手动类型判断（仍然支持）
+
+如果需要更细粒度的控制，仍然可以使用传统方式：
+
+```go
+func (ctrl *UserController) GetUser(c *web.HttpContext) web.IActionResult {
+    user, err := ctrl.userService.GetUser(id)
+    if err != nil {
+        // 手动判断错误类型
+        if bizErr, ok := err.(*errors.BizError); ok {
+            return c.BizError(bizErr)  // 自动映射状态码
+        }
+        return c.InternalError("服务器错误")
+    }
+    return c.Ok(user)
+}
+```
+
+### 自定义错误处理器（高级功能）
+
+为特定错误类型注册自定义处理逻辑：
+
+```go
+package main
+
+import (
+    "database/sql"
+    "errors"
+    "github.com/gocrud/csgo/web"
+)
+
+func init() {
+    // 注册数据库记录不存在错误处理器
+    web.RegisterErrorHandler(
+        func(err error) bool {
+            return errors.Is(err, sql.ErrNoRows)
+        },
+        func(err error, msg ...string) web.IActionResult {
+            message := "记录不存在"
+            if len(msg) > 0 && msg[0] != "" {
+                message = msg[0]
+            }
+            return web.Error(404, "NOT_FOUND", message)
+        },
+    )
+    
+    // 注册超时错误处理器
+    web.RegisterErrorHandler(
+        func(err error) bool {
+            return errors.Is(err, context.DeadlineExceeded)
+        },
+        func(err error, msg ...string) web.IActionResult {
+            return web.Error(408, "TIMEOUT", "请求超时")
+        },
+    )
+}
+
+// 控制器中使用，自动应用自定义处理器
+func (ctrl *UserController) GetUser(c *web.HttpContext) web.IActionResult {
+    user, err := ctrl.repo.FindByID(id) // 可能返回 sql.ErrNoRows
+    if err != nil {
+        return c.FromError(err, "用户不存在") // 自动使用注册的处理器
+    }
+    return c.Ok(user)
 }
 ```
 

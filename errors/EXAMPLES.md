@@ -204,12 +204,13 @@ func hashPassword(password string) string {
 
 ### 1.4 实现 Controller 层
 
+**推荐方式：使用 FromError（简洁优雅）**
+
 ```go
 package controllers
 
 import (
     "github.com/gin-gonic/gin"
-    "github.com/gocrud/csgo/errors"
     "github.com/gocrud/csgo/web"
     "myapp/models"
     "myapp/services"
@@ -237,7 +238,8 @@ func (ctrl *UserController) GetUser(c *gin.Context) {
     // 调用 Service
     user, err := ctrl.userService.GetUser(id)
     if err != nil {
-        ctrl.handleError(ctx, err).ExecuteResult(c)
+        // 使用 FromError 自动处理所有错误类型
+        ctx.FromError(err, "获取用户失败").ExecuteResult(c)
         return
     }
     
@@ -259,7 +261,8 @@ func (ctrl *UserController) CreateUser(c *gin.Context) {
     // 调用 Service
     user, err := ctrl.userService.CreateUser(req)
     if err != nil {
-        ctrl.handleError(ctx, err).ExecuteResult(c)
+        // 一行搞定所有错误处理
+        ctx.FromError(err, "创建用户失败").ExecuteResult(c)
         return
     }
     
@@ -285,7 +288,7 @@ func (ctrl *UserController) UpdateUser(c *gin.Context) {
     
     user, err := ctrl.userService.UpdateUser(id, req)
     if err != nil {
-        ctrl.handleError(ctx, err).ExecuteResult(c)
+        ctx.FromError(err, "更新用户失败").ExecuteResult(c)
         return
     }
     
@@ -304,21 +307,35 @@ func (ctrl *UserController) DeleteUser(c *gin.Context) {
     
     err := ctrl.userService.DeleteUser(id)
     if err != nil {
-        ctrl.handleError(ctx, err).ExecuteResult(c)
+        ctx.FromError(err, "删除用户失败").ExecuteResult(c)
         return
     }
     
     ctx.NoContent().ExecuteResult(c)
 }
+```
 
-// 统一错误处理
+**传统方式：手动类型判断（仍然支持）**
+
+```go
+// 如果需要更细粒度的控制，可以使用传统方式
+func (ctrl *UserController) GetUser(c *gin.Context) {
+    ctx := web.NewHttpContext(c)
+    
+    user, err := ctrl.userService.GetUser(id)
+    if err != nil {
+        ctrl.handleError(ctx, err).ExecuteResult(c)
+        return
+    }
+    
+    ctx.Ok(user).ExecuteResult(c)
+}
+
+// 统一错误处理（传统方式）
 func (ctrl *UserController) handleError(ctx *web.HttpContext, err error) web.IActionResult {
-    // 处理业务错误
     if bizErr, ok := err.(*errors.BizError); ok {
         return ctx.BizError(bizErr)
     }
-    
-    // 未预期的错误
     return ctx.InternalError("服务器错误")
 }
 ```

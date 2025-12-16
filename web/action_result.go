@@ -1,6 +1,10 @@
 package web
 
 import (
+	"reflect"
+	"sync"
+	"sync/atomic"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gocrud/csgo/errors"
 	"github.com/gocrud/csgo/validation"
@@ -378,4 +382,181 @@ func (r StatusResult) ExecuteResult(c *gin.Context) {
 // Status creates a status-only result.
 func Status(statusCode int) IActionResult {
 	return StatusResult{StatusCode: statusCode}
+}
+
+// ==================== Smart Error Handling ====================
+
+// ErrorHandler 错误处理器函数类型
+// 接收错误和默认消息，返回 IActionResult
+// 如果返回 nil，表示该处理器不处理此错误，继续尝试其他处理器
+type ErrorHandler func(err error, defaultMessage ...string) IActionResult
+
+var (
+	errorHandlersMu     sync.Mutex
+	errorHandlersAtomic atomic.Value // stores map[reflect.Type]ErrorHandler
+)
+
+func init() {
+	// 初始化空 map
+	errorHandlersAtomic.Store(make(map[reflect.Type]ErrorHandler))
+}
+
+// RegisterErrorHandler 注册错误类型处理器（泛型版本）
+// T: 错误类型，handler: 处理函数
+//
+// 使用示例：
+//
+//	// 注册自定义错误处理器
+//	web.RegisterErrorHandler[*MyCustomError](func(err *MyCustomError, msg ...string) web.IActionResult {
+//	    return web.BadRequest(err.Details)
+//	})
+//
+//	// 注册数据库错误处理器
+//	web.RegisterErrorHandler[*sql.ErrNoRows](func(err *sql.ErrNoRows, msg ...string) web.IActionResult {
+//	    return web.NotFound("记录不存在")
+//	})
+func RegisterErrorHandler[T error](handler func(T, ...string) IActionResult) {
+	errorHandlersMu.Lock()
+	defer errorHandlersMu.Unlock()
+
+	// 获取错误类型
+	var zero T
+	errType := reflect.TypeOf(zero)
+
+	// Copy-on-Write：复制现有 map 并添加新处理器
+	oldMap := errorHandlersAtomic.Load().(map[reflect.Type]ErrorHandler)
+	newMap := make(map[reflect.Type]ErrorHandler, len(oldMap)+1)
+	for k, v := range oldMap {
+		newMap[k] = v
+	}
+
+	// 包装为通用 ErrorHandler
+	newMap[errType] = func(err error, msg ...string) IActionResult {
+		typedErr, ok := err.(T)
+		if !ok {
+			return nil
+		}
+		return handler(typedErr, msg...)
+	}
+
+	// 原子替换
+	errorHandlersAtomic.Store(newMap)
+}
+
+// ClearErrorHandlers 清除所有自定义错误处理器
+// 主要用于测试场景
+func ClearErrorHandlers() {
+	errorHandlersMu.Lock()
+	defer errorHandlersMu.Unlock()
+	errorHandlersAtomic.Store(make(map[reflect.Type]ErrorHandler))
+}
+
+// FromError 智能处理各种类型的错误并返回对应的 ActionResult
+// 错误处理优先级：
+// 1. 自定义错误处理器（如果已注册）
+// 2. *errors.BizError：自动映射 HTTP 状态码
+// 3. validation.ValidationErrors：返回验证错误响应
+// 4. 普通 error：返回内部错误，使用自定义消息
+//
+// 使用示例：
+//
+//	user, err := service.GetUser(id)
+//	if err != nil {
+//	    return web.FromError(err, "获取用户失败")
+//	}
+func FromError(err error, defaultMessage ...string) IActionResult {
+	// nil 检查
+	if err == nil {
+		return nil
+	}
+
+	// 1. 尝试类型匹配处理器（O(1) map 查找，无循环）
+	handlersMap := errorHandlersAtomic.Load().(map[reflect.Type]ErrorHandler)
+	if handler, ok := handlersMap[reflect.TypeOf(err)]; ok {
+		if result := handler(err, defaultMessage...); result != nil {
+			return result
+		}
+	}
+
+	// 2. 检查是否为 BizError
+	if bizErr, ok := err.(*errors.BizError); ok {
+		return BizError(bizErr)
+	}
+
+	// 3. 检查是否为 ValidationErrors
+	if valErrs, ok := err.(validation.ValidationErrors); ok {
+		return ValidationBadRequest(valErrs)
+	}
+
+	// 4. 普通 error，返回 500
+	msg := "服务器内部错误"
+	if len(defaultMessage) > 0 && defaultMessage[0] != "" {
+		msg = defaultMessage[0]
+	}
+	return InternalError(msg)
+}
+
+// FromErrorWithStatus 类似 FromError，但允许为普通 error 指定自定义 HTTP 状态码
+// 错误处理优先级：
+// 1. 自定义错误处理器（如果已注册）
+// 2. *errors.BizError：忽略 statusCode，使用自动映射
+// 3. validation.ValidationErrors：忽略 statusCode，固定返回 400
+// 4. 普通 error：使用指定的 statusCode
+//
+// 使用示例：
+//
+//	err := db.Connect()
+//	if err != nil {
+//	    return web.FromErrorWithStatus(err, 503, "数据库服务暂时不可用")
+//	}
+func FromErrorWithStatus(err error, statusCode int, defaultMessage ...string) IActionResult {
+	// nil 检查
+	if err == nil {
+		return nil
+	}
+
+	// 1. 尝试类型匹配处理器（O(1) map 查找，无循环）
+	handlersMap := errorHandlersAtomic.Load().(map[reflect.Type]ErrorHandler)
+	if handler, ok := handlersMap[reflect.TypeOf(err)]; ok {
+		if result := handler(err, defaultMessage...); result != nil {
+			return result
+		}
+	}
+
+	// 2. 检查是否为 BizError（忽略 statusCode）
+	if bizErr, ok := err.(*errors.BizError); ok {
+		return BizError(bizErr)
+	}
+
+	// 3. 检查是否为 ValidationErrors（忽略 statusCode）
+	if valErrs, ok := err.(validation.ValidationErrors); ok {
+		return ValidationBadRequest(valErrs)
+	}
+
+	// 4. 普通 error，使用指定的 statusCode
+	msg := "服务器内部错误"
+	if len(defaultMessage) > 0 && defaultMessage[0] != "" {
+		msg = defaultMessage[0]
+	}
+
+	// 根据状态码确定错误码
+	code := "ERROR"
+	switch statusCode {
+	case 400:
+		code = "BAD_REQUEST"
+	case 401:
+		code = "UNAUTHORIZED"
+	case 403:
+		code = "FORBIDDEN"
+	case 404:
+		code = "NOT_FOUND"
+	case 409:
+		code = "CONFLICT"
+	case 500:
+		code = "INTERNAL_ERROR"
+	case 503:
+		code = "SERVICE_UNAVAILABLE"
+	}
+
+	return Error(statusCode, code, msg)
 }
