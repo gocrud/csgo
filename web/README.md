@@ -638,8 +638,63 @@ return web.Json(200, web.M{"custom": "format"})
 return web.File("/path/to/file.pdf")
 return web.FileDownload("/path/to/file.pdf", "download.pdf")
 
+// 图片响应（二进制流）
+return web.PNG(imageData)
+return web.JPEG(imageData)
+return web.WebP(imageData)
+return web.BinaryImage(imageData, "image/gif")
+
+// 图片响应（Base64编码的JSON）
+return web.Base64Image(imageData, "image/png")
+
 // 仅状态码
 return web.Status(204)
+```
+
+### 图片响应详解
+
+框架提供了专门的图片响应方法：
+
+```go
+// 方式1：二进制图片流（直接返回图片数据）
+func getAvatar(c *web.HttpContext) web.IActionResult {
+    imageData, _ := loadImageFromDB()
+    return web.PNG(imageData)  // 返回PNG格式
+}
+
+// 方式2：Base64编码（包含在JSON中）
+func getThumbnail(c *web.HttpContext) web.IActionResult {
+    imageData, _ := loadThumbnailFromDB()
+    return web.Base64Image(imageData, "image/png")
+}
+// 响应格式：{"success": true, "data": {"image": "base64...", "contentType": "image/png"}}
+
+// 所有支持的图片格式
+web.PNG(imageData)           // image/png
+web.JPEG(imageData)          // image/jpeg
+web.WebP(imageData)          // image/webp
+web.BinaryImage(data, type)  // 自定义类型
+```
+
+**OpenAPI 配置：**
+
+```go
+import "github.com/gocrud/csgo/openapi"
+
+// 二进制图片
+app.MapGet("/api/images/logo", getLogoPNG).
+    WithOpenApi(
+        openapi.OptSummary("获取Logo"),
+        openapi.OptBinaryImageResponse("image/png"),
+    )
+
+// Base64 图片
+app.MapGet("/api/images/thumbnail/:id", getThumbnail).
+    WithOpenApi(
+        openapi.OptSummary("获取缩略图"),
+        openapi.OptBase64ImageResponse(),
+        openapi.OptPath[int]("id", "图片ID"),
+    )
 ```
 
 ## 控制器模式
@@ -1099,6 +1154,13 @@ BindQuery(target interface{}) (bool, IActionResult)
 
 // 验证
 BindAndValidate[T any](c *HttpContext) (*T, IActionResult)
+
+// 图片响应
+PNG(imageData []byte) IActionResult
+JPEG(imageData []byte) IActionResult
+WebP(imageData []byte) IActionResult
+BinaryImage(imageData []byte, contentType string) IActionResult
+Base64Image(imageData []byte, contentType string) IActionResult
 ```
 
 ## 常见问题

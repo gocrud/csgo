@@ -1,4 +1,4 @@
-package routing
+package router
 
 import (
 	"path"
@@ -148,10 +148,11 @@ func (g *RouteGroupBuilder) mapRoute(method, pattern string, handlers ...Handler
 		if openApiMeta, ok := meta.(*OpenApiMetadata); ok && openApiMeta.Enabled {
 			rb.openApiEnabled = true
 		}
-		if groupOpts, ok := meta.(*GroupEndpointOptions); ok {
-			for _, opt := range groupOpts.Options {
-				opt(rb)
-			}
+		if groupConfig, ok := meta.(*GroupOpenApiConfig); ok && groupConfig.Configure != nil {
+			// Apply group's OpenAPI configuration to this route
+			rb.openApiEnabled = true
+			builder := &OpenApiBuilder{builder: rb}
+			groupConfig.Configure(builder)
 		}
 	}
 
@@ -162,13 +163,13 @@ func (g *RouteGroupBuilder) mapRoute(method, pattern string, handlers ...Handler
 }
 
 // WithOpenApi enables OpenAPI documentation for this group.
-// Options are stored and will be applied to routes created in this group.
-func (g *RouteGroupBuilder) WithOpenApi(options ...EndpointOption) *RouteGroupBuilder {
+// Configuration will be applied to all routes created in this group.
+func (g *RouteGroupBuilder) WithOpenApi(configure func(*OpenApiBuilder)) *RouteGroupBuilder {
 	g.metadata = append(g.metadata, &OpenApiMetadata{Enabled: true})
 
-	// Store options in metadata to be applied to child routes
-	if len(options) > 0 {
-		g.metadata = append(g.metadata, &GroupEndpointOptions{Options: options})
+	// Store configuration in metadata to be applied to child routes
+	if configure != nil {
+		g.metadata = append(g.metadata, &GroupOpenApiConfig{Configure: configure})
 	}
 
 	return g
@@ -184,9 +185,9 @@ type OpenApiMetadata struct {
 	Enabled bool
 }
 
-// GroupEndpointOptions holds endpoint options to be applied to group routes.
-type GroupEndpointOptions struct {
-	Options []EndpointOption
+// GroupOpenApiConfig holds OpenAPI configuration to be applied to group routes.
+type GroupOpenApiConfig struct {
+	Configure func(*OpenApiBuilder)
 }
 
 // AuthorizationMetadata represents authorization metadata.

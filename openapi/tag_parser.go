@@ -8,21 +8,21 @@ import (
 
 // FieldInfo contains OpenAPI information for a struct field.
 type FieldInfo struct {
-	Name        string
-	Description string
-	Example     interface{}
-	Required    bool
-	Format      string
-	Minimum     *float64
-	Maximum     *float64
-	MinLength   *int
-	MaxLength   *int
-	Pattern     string
-	Enum        []interface{}
+	Name             string
+	Description      string
+	Example          interface{}
+	Required         bool
+	Format           string
+	ContentMediaType string // For images: image/png, image/jpeg, etc.
+	Minimum          *float64
+	Maximum          *float64
+	MinLength        *int
+	MaxLength        *int
+	Pattern          string
+	Enum             []interface{}
 }
 
 // ParseStructTags parses struct tags to generate field information.
-// It supports both the custom "doc" tag and individual tags for compatibility.
 func ParseStructTags(t reflect.Type) map[string]FieldInfo {
 	fields := make(map[string]FieldInfo)
 
@@ -61,37 +61,51 @@ func parseFieldTags(field reflect.StructField) FieldInfo {
 		}
 	}
 
-	// Parse custom "doc" tag - format: "描述,required,example:value,min:0,max:100"
-	if docTag := field.Tag.Get("doc"); docTag != "" {
-		parseDocTag(&info, docTag)
-	}
-
-	// Also support individual tags for backward compatibility or explicit overrides
-	if desc := field.Tag.Get("description"); desc != "" {
+	// Parse individual tags
+	if desc := field.Tag.Get("desc"); desc != "" {
 		info.Description = desc
 	}
 	if example := field.Tag.Get("example"); example != "" {
 		info.Example = example
 	}
+
+	// Parse file tag (convenience for file upload fields)
+	// file:"true" -> format: binary (for multipart/form-data)
+	if fileTag := field.Tag.Get("file"); fileTag == "true" {
+		info.Format = "binary"
+	}
+
+	// Parse image tag (convenience for Base64 images)
+	// image:"png" -> format: byte, media: image/png
+	if imageTag := field.Tag.Get("image"); imageTag != "" {
+		info.Format = "byte"
+		info.ContentMediaType = parseImageMediaType(imageTag)
+	}
+
+	// Parse format and media tags (can override file and image tags)
 	if format := field.Tag.Get("format"); format != "" {
 		info.Format = format
 	}
-	if min := field.Tag.Get("minimum"); min != "" {
+	if media := field.Tag.Get("media"); media != "" {
+		info.ContentMediaType = media
+	}
+
+	if min := field.Tag.Get("min"); min != "" {
 		if val, err := strconv.ParseFloat(min, 64); err == nil {
 			info.Minimum = &val
 		}
 	}
-	if max := field.Tag.Get("maximum"); max != "" {
+	if max := field.Tag.Get("max"); max != "" {
 		if val, err := strconv.ParseFloat(max, 64); err == nil {
 			info.Maximum = &val
 		}
 	}
-	if minLen := field.Tag.Get("minLength"); minLen != "" {
+	if minLen := field.Tag.Get("minLen"); minLen != "" {
 		if val, err := strconv.Atoi(minLen); err == nil {
 			info.MinLength = &val
 		}
 	}
-	if maxLen := field.Tag.Get("maxLength"); maxLen != "" {
+	if maxLen := field.Tag.Get("maxLen"); maxLen != "" {
 		if val, err := strconv.Atoi(maxLen); err == nil {
 			info.MaxLength = &val
 		}
@@ -102,86 +116,11 @@ func parseFieldTags(field reflect.StructField) FieldInfo {
 	if enumTag := field.Tag.Get("enum"); enumTag != "" {
 		parseEnumTag(&info, enumTag)
 	}
+	if required := field.Tag.Get("required"); required == "true" {
+		info.Required = true
+	}
 
 	return info
-}
-
-// parseDocTag parses the custom doc tag.
-// Format: "描述,required,example:value,minLength:2,maxLength:50,min:0,max:100,format:email,enum:a|b|c"
-func parseDocTag(info *FieldInfo, docTag string) {
-	parts := strings.Split(docTag, ",")
-	if len(parts) == 0 {
-		return
-	}
-
-	// First part is always the description
-	info.Description = strings.TrimSpace(parts[0])
-
-	// Parse remaining parts as key:value or flags
-	for i := 1; i < len(parts); i++ {
-		part := strings.TrimSpace(parts[i])
-		if part == "" {
-			continue
-		}
-
-		// Check if it's a key:value pair
-		if strings.Contains(part, ":") {
-			kv := strings.SplitN(part, ":", 2)
-			if len(kv) != 2 {
-				continue
-			}
-			key := strings.TrimSpace(kv[0])
-			value := strings.TrimSpace(kv[1])
-
-			switch key {
-			case "example":
-				info.Example = value
-			case "format":
-				info.Format = value
-			case "min":
-				// For numbers, this is minimum
-				if val, err := strconv.ParseFloat(value, 64); err == nil {
-					info.Minimum = &val
-				}
-			case "max":
-				// For numbers, this is maximum
-				if val, err := strconv.ParseFloat(value, 64); err == nil {
-					info.Maximum = &val
-				}
-			case "minLength":
-				if val, err := strconv.Atoi(value); err == nil {
-					info.MinLength = &val
-				}
-			case "maxLength":
-				if val, err := strconv.Atoi(value); err == nil {
-					info.MaxLength = &val
-				}
-			case "minimum":
-				if val, err := strconv.ParseFloat(value, 64); err == nil {
-					info.Minimum = &val
-				}
-			case "maximum":
-				if val, err := strconv.ParseFloat(value, 64); err == nil {
-					info.Maximum = &val
-				}
-			case "pattern":
-				info.Pattern = value
-			case "enum":
-				// Enum values separated by |
-				enumValues := strings.Split(value, "|")
-				info.Enum = make([]interface{}, len(enumValues))
-				for j, v := range enumValues {
-					info.Enum[j] = strings.TrimSpace(v)
-				}
-			}
-		} else {
-			// It's a flag
-			switch part {
-			case "required":
-				info.Required = true
-			}
-		}
-	}
 }
 
 // parseEnumTag parses enum tag (comma or pipe separated).
@@ -197,6 +136,33 @@ func parseEnumTag(info *FieldInfo, enumTag string) {
 	info.Enum = make([]interface{}, len(enumValues))
 	for i, v := range enumValues {
 		info.Enum[i] = strings.TrimSpace(v)
+	}
+}
+
+// parseImageMediaType converts short image type to full media type.
+// png -> image/png, jpg/jpeg -> image/jpeg, etc.
+func parseImageMediaType(imageType string) string {
+	switch strings.ToLower(imageType) {
+	case "png":
+		return "image/png"
+	case "jpg", "jpeg":
+		return "image/jpeg"
+	case "gif":
+		return "image/gif"
+	case "webp":
+		return "image/webp"
+	case "svg":
+		return "image/svg+xml"
+	case "bmp":
+		return "image/bmp"
+	case "ico":
+		return "image/x-icon"
+	default:
+		// If already in full format or unknown, return as-is
+		if strings.HasPrefix(imageType, "image/") {
+			return imageType
+		}
+		return "image/" + imageType
 	}
 }
 

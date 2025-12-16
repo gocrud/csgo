@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/hosting"
-	"github.com/gocrud/csgo/web/routing"
+	"github.com/gocrud/csgo/web/router"
 )
 
 // WebApplication represents the configured web application.
@@ -15,8 +15,8 @@ type WebApplication struct {
 	engine      *gin.Engine
 	Services    di.IServiceProvider // ✅ 直接暴露，强类型
 	Environment hosting.IHostEnvironment
-	routes      []*routing.RouteBuilder
-	groups      []*routing.RouteGroupBuilder
+	routes      []*router.RouteBuilder
+	groups      []*router.RouteGroupBuilder
 	runtimeUrls *[]string // Pointer to runtime URLs (shared with HttpServer)
 
 	// Handler converter with services injection
@@ -59,7 +59,7 @@ func (app *WebApplication) Use(middleware ...gin.HandlerFunc) {
 //   - gin.HandlerFunc
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
-func (app *WebApplication) MapGet(pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
+func (app *WebApplication) MapGet(pattern string, handlers ...Handler) router.IEndpointConventionBuilder {
 	return app.mapRoute("GET", pattern, handlers...)
 }
 
@@ -68,7 +68,7 @@ func (app *WebApplication) MapGet(pattern string, handlers ...Handler) routing.I
 //   - gin.HandlerFunc
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
-func (app *WebApplication) MapPost(pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
+func (app *WebApplication) MapPost(pattern string, handlers ...Handler) router.IEndpointConventionBuilder {
 	return app.mapRoute("POST", pattern, handlers...)
 }
 
@@ -77,7 +77,7 @@ func (app *WebApplication) MapPost(pattern string, handlers ...Handler) routing.
 //   - gin.HandlerFunc
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
-func (app *WebApplication) MapPut(pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
+func (app *WebApplication) MapPut(pattern string, handlers ...Handler) router.IEndpointConventionBuilder {
 	return app.mapRoute("PUT", pattern, handlers...)
 }
 
@@ -86,7 +86,7 @@ func (app *WebApplication) MapPut(pattern string, handlers ...Handler) routing.I
 //   - gin.HandlerFunc
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
-func (app *WebApplication) MapDelete(pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
+func (app *WebApplication) MapDelete(pattern string, handlers ...Handler) router.IEndpointConventionBuilder {
 	return app.mapRoute("DELETE", pattern, handlers...)
 }
 
@@ -95,7 +95,7 @@ func (app *WebApplication) MapDelete(pattern string, handlers ...Handler) routin
 //   - gin.HandlerFunc
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
-func (app *WebApplication) MapPatch(pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
+func (app *WebApplication) MapPatch(pattern string, handlers ...Handler) router.IEndpointConventionBuilder {
 	return app.mapRoute("PATCH", pattern, handlers...)
 }
 
@@ -104,12 +104,12 @@ func (app *WebApplication) MapPatch(pattern string, handlers ...Handler) routing
 //   - gin.HandlerFunc
 //   - func(*HttpContext)
 //   - func(*HttpContext) IActionResult
-func (app *WebApplication) MapGroup(prefix string, handlers ...Handler) *routing.RouteGroupBuilder {
+func (app *WebApplication) MapGroup(prefix string, handlers ...Handler) *router.RouteGroupBuilder {
 	// Convert handlers for group middleware using services-aware converter
 	ginHandlers := app.toHandlers(handlers...)
 
 	ginGroup := app.engine.Group(prefix, ginHandlers...)
-	group := routing.NewRouteGroupBuilder(ginGroup, prefix)
+	group := router.NewRouteGroupBuilder(ginGroup, prefix)
 
 	// Set handler converter with services injection
 	group.SetHandlerConverter(app.toHandler)
@@ -119,7 +119,7 @@ func (app *WebApplication) MapGroup(prefix string, handlers ...Handler) *routing
 }
 
 // mapRoute is the internal method to register a route.
-func (app *WebApplication) mapRoute(method, pattern string, handlers ...Handler) routing.IEndpointConventionBuilder {
+func (app *WebApplication) mapRoute(method, pattern string, handlers ...Handler) router.IEndpointConventionBuilder {
 	// Convert handlers to gin.HandlerFunc using services-aware converter
 	ginHandlers := app.toHandlers(handlers...)
 
@@ -127,15 +127,15 @@ func (app *WebApplication) mapRoute(method, pattern string, handlers ...Handler)
 	app.engine.Handle(method, pattern, ginHandlers...)
 
 	// Create route builder
-	rb := routing.NewRouteBuilder(method, pattern)
+	rb := router.NewRouteBuilder(method, pattern)
 	app.routes = append(app.routes, rb)
 
 	return rb
 }
 
 // GetRoutes returns all registered routes.
-func (app *WebApplication) GetRoutes() []*routing.RouteBuilder {
-	allRoutes := make([]*routing.RouteBuilder, 0)
+func (app *WebApplication) GetRoutes() []*router.RouteBuilder {
+	allRoutes := make([]*router.RouteBuilder, 0)
 
 	// Add top-level routes
 	allRoutes = append(allRoutes, app.routes...)

@@ -11,7 +11,7 @@ import (
 	"github.com/gocrud/csgo/configuration"
 	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/hosting"
-	"github.com/gocrud/csgo/web/routing"
+	"github.com/gocrud/csgo/web/router"
 )
 
 // WebApplicationBuilder is a builder for web applications.
@@ -82,8 +82,8 @@ func (b *WebApplicationBuilder) Build() *WebApplication {
 		engine:      engine,
 		Services:    services,
 		Environment: b.Environment,
-		routes:      make([]*routing.RouteBuilder, 0),
-		groups:      make([]*routing.RouteGroupBuilder, 0),
+		routes:      make([]*router.RouteBuilder, 0),
+		groups:      make([]*router.RouteGroupBuilder, 0),
 		runtimeUrls: runtimeUrls, // Shared pointer
 
 		// Initialize handler converters with services injection

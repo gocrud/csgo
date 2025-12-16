@@ -100,21 +100,22 @@ type SecurityScheme struct {
 
 // Schema represents a schema object.
 type Schema struct {
-	Type        string            `json:"type,omitempty"`
-	Description string            `json:"description,omitempty"`
-	Format      string            `json:"format,omitempty"`
-	Example     interface{}       `json:"example,omitempty"`
-	Properties  map[string]Schema `json:"properties,omitempty"`
-	Items       *Schema           `json:"items,omitempty"` // for array
-	Ref         string            `json:"$ref,omitempty"`
-	Enum        []interface{}     `json:"enum,omitempty"`
-	Required    []string          `json:"required,omitempty"`
-	Minimum     *float64          `json:"minimum,omitempty"`
-	Maximum     *float64          `json:"maximum,omitempty"`
-	MinLength   *int              `json:"minLength,omitempty"`
-	MaxLength   *int              `json:"maxLength,omitempty"`
-	Pattern     string            `json:"pattern,omitempty"`
-	Nullable    bool              `json:"nullable,omitempty"`
+	Type             string            `json:"type,omitempty"`
+	Description      string            `json:"description,omitempty"`
+	Format           string            `json:"format,omitempty"`
+	ContentMediaType string            `json:"contentMediaType,omitempty"` // For Base64 images, e.g., image/png
+	Example          interface{}       `json:"example,omitempty"`
+	Properties       map[string]Schema `json:"properties,omitempty"`
+	Items            *Schema           `json:"items,omitempty"` // for array
+	Ref              string            `json:"$ref,omitempty"`
+	Enum             []interface{}     `json:"enum,omitempty"`
+	Required         []string          `json:"required,omitempty"`
+	Minimum          *float64          `json:"minimum,omitempty"`
+	Maximum          *float64          `json:"maximum,omitempty"`
+	MinLength        *int              `json:"minLength,omitempty"`
+	MaxLength        *int              `json:"maxLength,omitempty"`
+	Pattern          string            `json:"pattern,omitempty"`
+	Nullable         bool              `json:"nullable,omitempty"`
 }
 
 // Tag adds metadata to a single tag.

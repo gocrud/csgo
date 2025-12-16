@@ -209,6 +209,29 @@ func (g *Generator) addResponse(spec *Specification, op *Operation, meta interfa
 	isErrorResponse := v.FieldByName("IsErrorResponse").Bool()
 	typeField := v.FieldByName("Type")
 
+	// Get ContentType, Format, and Schema fields
+	contentTypeField := v.FieldByName("ContentType")
+	formatField := v.FieldByName("Format")
+	schemaField := v.FieldByName("Schema")
+
+	var contentType string
+	var format string
+	var customSchema *Schema
+
+	if contentTypeField.IsValid() && contentTypeField.String() != "" {
+		contentType = contentTypeField.String()
+	}
+
+	if formatField.IsValid() && formatField.String() != "" {
+		format = formatField.String()
+	}
+
+	if schemaField.IsValid() && !schemaField.IsZero() {
+		if schemaPtr, ok := schemaField.Interface().(*Schema); ok && schemaPtr != nil {
+			customSchema = schemaPtr
+		}
+	}
+
 	statusCodeStr := strings.TrimSpace(strings.Split(strings.TrimPrefix(http.StatusText(statusCode), "HTTP "), " ")[0])
 	if statusCodeStr == "" {
 		statusCodeStr = "200"
@@ -219,6 +242,84 @@ func (g *Generator) addResponse(spec *Specification, op *Operation, meta interfa
 		statusCodeStr = strconv.Itoa(statusCode)
 	} else {
 		statusCodeStr = "200"
+	}
+
+	// Handle binary image responses (image/png, image/jpeg, etc.)
+	if contentType != "" && strings.HasPrefix(contentType, "image/") {
+		op.Responses[statusCodeStr] = Response{
+			Description: getDefaultResponseDescription(statusCode),
+			Content: map[string]MediaType{
+				contentType: {
+					Schema: Schema{
+						Type:   "string",
+						Format: "binary",
+					},
+				},
+			},
+		}
+		return
+	}
+
+	// Handle Base64 image response (JSON with base64 string)
+	if format == "byte" && isApiResponse {
+		apiResponseSchema := Schema{
+			Type: "object",
+			Properties: map[string]Schema{
+				"success": {Type: "boolean", Description: "请求是否成功"},
+				"data": {
+					Type: "object",
+					Properties: map[string]Schema{
+						"image": {
+							Type:        "string",
+							Format:      "byte",
+							Description: "Base64编码的图片数据",
+						},
+						"contentType": {
+							Type:        "string",
+							Description: "图片类型（如 image/png）",
+						},
+					},
+				},
+			},
+		}
+
+		op.Responses[statusCodeStr] = Response{
+			Description: getDefaultResponseDescription(statusCode),
+			Content: map[string]MediaType{
+				"application/json": {Schema: apiResponseSchema},
+			},
+		}
+		return
+	}
+
+	// Handle custom Schema (if provided)
+	if customSchema != nil {
+		ct := "application/json"
+		if contentType != "" {
+			ct = contentType
+		}
+
+		var responseSchema Schema
+		if isApiResponse && !isErrorResponse {
+			// Wrap in ApiResponse
+			responseSchema = Schema{
+				Type: "object",
+				Properties: map[string]Schema{
+					"success": {Type: "boolean", Description: "请求是否成功"},
+					"data":    *customSchema,
+				},
+			}
+		} else {
+			responseSchema = *customSchema
+		}
+
+		op.Responses[statusCodeStr] = Response{
+			Description: getDefaultResponseDescription(statusCode),
+			Content: map[string]MediaType{
+				ct: {Schema: responseSchema},
+			},
+		}
+		return
 	}
 
 	if isProblem {
@@ -307,7 +408,22 @@ func (g *Generator) addRequestBody(spec *Specification, op *Operation, meta inte
 
 	contentType := v.FieldByName("ContentType").String()
 	typeField := v.FieldByName("Type")
+	schemaField := v.FieldByName("Schema")
 
+	// Check for custom Schema
+	if schemaField.IsValid() && !schemaField.IsZero() {
+		if schemaPtr, ok := schemaField.Interface().(*Schema); ok && schemaPtr != nil {
+			op.RequestBody = &RequestBody{
+				Required: true,
+				Content: map[string]MediaType{
+					contentType: {Schema: *schemaPtr},
+				},
+			}
+			return
+		}
+	}
+
+	// Use type-based schema generation
 	if typeField.IsValid() && !typeField.IsZero() {
 		reflectType := typeField.Interface().(reflect.Type)
 		schema := g.generateSchemaFromReflectType(spec, reflectType)
@@ -420,6 +536,9 @@ func (g *Generator) generateFieldSchema(spec *Specification, structType reflect.
 	}
 	if fieldInfo.Format != "" {
 		schema.Format = fieldInfo.Format
+	}
+	if fieldInfo.ContentMediaType != "" {
+		schema.ContentMediaType = fieldInfo.ContentMediaType
 	}
 	if fieldInfo.Example != nil {
 		schema.Example = fieldInfo.Example
@@ -631,7 +750,7 @@ func registerSchema(spec *Specification, obj interface{}) string {
 
 		schema.Properties[fieldName] = Schema{
 			Type:        fieldType,
-			Description: f.Tag.Get("description"),
+			Description: f.Tag.Get("desc"),
 		}
 	}
 

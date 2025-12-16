@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/base64"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -559,4 +560,75 @@ func FromErrorWithStatus(err error, statusCode int, defaultMessage ...string) IA
 	}
 
 	return Error(statusCode, code, msg)
+}
+
+// ==================== Image Results ====================
+
+// Base64ImageResult represents an image response as base64 in JSON.
+type Base64ImageResult struct {
+	StatusCode  int
+	ImageData   string // Base64 encoded image
+	ContentType string // Original image content type (e.g., image/png)
+}
+
+// ExecuteResult implements IActionResult.
+func (r Base64ImageResult) ExecuteResult(c *gin.Context) {
+	c.JSON(r.StatusCode, ApiResponse{
+		Success: true,
+		Data: M{
+			"image":       r.ImageData,
+			"contentType": r.ContentType,
+		},
+	})
+}
+
+// Base64Image creates a base64 image result.
+// The image data is encoded as base64 and returned in JSON format.
+func Base64Image(imageData []byte, contentType string) IActionResult {
+	encoded := base64.StdEncoding.EncodeToString(imageData)
+	return Base64ImageResult{
+		StatusCode:  200,
+		ImageData:   encoded,
+		ContentType: contentType,
+	}
+}
+
+// BinaryImageResult represents a binary image response.
+type BinaryImageResult struct {
+	StatusCode  int
+	ImageData   []byte
+	ContentType string // e.g., image/png, image/jpeg
+}
+
+// ExecuteResult implements IActionResult.
+func (r BinaryImageResult) ExecuteResult(c *gin.Context) {
+	c.Data(r.StatusCode, r.ContentType, r.ImageData)
+}
+
+// BinaryImage creates a binary image result.
+// The image data is returned as raw binary with the specified content type.
+func BinaryImage(imageData []byte, contentType string) IActionResult {
+	return BinaryImageResult{
+		StatusCode:  200,
+		ImageData:   imageData,
+		ContentType: contentType,
+	}
+}
+
+// PNG creates a PNG image result.
+// Convenience method for BinaryImage with image/png content type.
+func PNG(imageData []byte) IActionResult {
+	return BinaryImage(imageData, "image/png")
+}
+
+// JPEG creates a JPEG image result.
+// Convenience method for BinaryImage with image/jpeg content type.
+func JPEG(imageData []byte) IActionResult {
+	return BinaryImage(imageData, "image/jpeg")
+}
+
+// WebP creates a WebP image result.
+// Convenience method for BinaryImage with image/webp content type.
+func WebP(imageData []byte) IActionResult {
+	return BinaryImage(imageData, "image/webp")
 }

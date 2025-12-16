@@ -1,6 +1,4 @@
-package routing
-
-import "reflect"
+package router
 
 // EndpointOption is a function that configures an endpoint.
 type EndpointOption func(IEndpointConventionBuilder) IEndpointConventionBuilder
@@ -10,7 +8,7 @@ type EndpointOption func(IEndpointConventionBuilder) IEndpointConventionBuilder
 type IEndpointConventionBuilder interface {
 	// WithOpenApi enables OpenAPI documentation for this endpoint and applies options.
 	// Corresponds to .NET endpoint.WithOpenApi().
-	WithOpenApi(options ...EndpointOption) IEndpointConventionBuilder
+	WithOpenApi(configure func(*OpenApiBuilder)) IEndpointConventionBuilder
 }
 
 // RouteBuilder implements IEndpointConventionBuilder.
@@ -43,18 +41,17 @@ func NewRouteBuilder(method, path string) *RouteBuilder {
 
 // WithOpenApi enables OpenAPI documentation for this endpoint and applies options.
 // Corresponds to .NET endpoint.WithOpenApi().
-func (b *RouteBuilder) WithOpenApi(options ...EndpointOption) IEndpointConventionBuilder {
+func (b *RouteBuilder) WithOpenApi(configure func(*OpenApiBuilder)) IEndpointConventionBuilder {
 	b.openApiEnabled = true
 
-	// Apply all options
-	for _, option := range options {
-		option(b)
-	}
+	// Create builder and apply configuration
+	builder := &OpenApiBuilder{builder: b}
+	configure(builder)
 
 	return b
 }
 
-// Setter methods for openapi package to configure endpoints
+// Setter methods for OpenApiBuilder to configure endpoints
 
 // SetName sets the endpoint name.
 func (b *RouteBuilder) SetName(name string) {
@@ -103,30 +100,6 @@ func (b *RouteBuilder) SetAllowAnonymous(allow bool) {
 	if allow {
 		b.authPolicies = nil
 	}
-}
-
-// ResponseMetadata represents response metadata.
-type ResponseMetadata struct {
-	StatusCode      int
-	Type            reflect.Type
-	IsProblem       bool
-	IsApiResponse   bool // Indicates if the response should be wrapped in web.ApiResponse
-	IsErrorResponse bool // Indicates if this is an error response (only error field populated)
-}
-
-// RequestMetadata represents request metadata.
-type RequestMetadata struct {
-	ContentType string
-	Type        reflect.Type
-}
-
-// ParameterMetadata represents parameter metadata.
-type ParameterMetadata struct {
-	Name        string
-	In          string // path, query, header, cookie
-	Description string
-	Required    bool
-	Type        reflect.Type
 }
 
 // AddParameterMetadata adds parameter metadata.
