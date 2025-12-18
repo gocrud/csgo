@@ -471,7 +471,7 @@ func FromError(err error, defaultMessage ...string) IActionResult {
 		return nil
 	}
 
-	// 1. 尝试类型匹配处理器（O(1) map 查找，无循环）
+	// 1. 尝试类型匹配处理器（O(1) map 查找）
 	handlersMap := errorHandlersAtomic.Load().(map[reflect.Type]ErrorHandler)
 	if handler, ok := handlersMap[reflect.TypeOf(err)]; ok {
 		if result := handler(err, defaultMessage...); result != nil {

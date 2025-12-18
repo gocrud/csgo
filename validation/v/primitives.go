@@ -56,6 +56,10 @@ func (i *Int) MsgGroup(msg string) *Int {
 	return i
 }
 
+func (i *Int) Value() int {
+	return int(*i)
+}
+
 // ==================== String ====================
 
 type String string
@@ -167,4 +171,8 @@ func (s *String) Msg(msg string) *String {
 func (s *String) MsgGroup(msg string) *String {
 	validation.SetGroupMsg(unsafe.Pointer(s), msg)
 	return s
+}
+
+func (s *String) Value() string {
+	return string(*s)
 }

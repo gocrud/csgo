@@ -12,8 +12,6 @@ import (
 	"github.com/gocrud/csgo/validation"
 )
 
-// HttpContext wraps gin.Context and provides unified API for HTTP handling.
-// Access the underlying gin.Context via RawCtx() method.
 type HttpContext struct {
 	gin *gin.Context
 
@@ -199,35 +197,39 @@ func (c *HttpContext) BindQuery(target interface{}) (ok bool, result IActionResu
 
 // ==================== Validation ====================
 
-// BindAndValidate binds JSON body and validates using FluentValidation validator.
-// Returns the bound object and nil if successful, or nil and an error result if failed.
-// 自动使用注册验证器的模式(快速失败或全量验证)
-func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
+// handleBindError 处理绑定错误,返回友好的错误信息
+func handleBindError(c *HttpContext, err error) IActionResult {
+	// 检查是否为 EOF 错误(空请求体)
+	if err == io.EOF || err.Error() == "EOF" {
+		return c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
+	}
+
+	// 检查是否为不完整的 JSON
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "unexpected end of JSON input") ||
+		strings.Contains(errMsg, "unexpected EOF") {
+		return c.BadRequest("请求体格式不完整,请提供完整的 JSON 数据")
+	}
+
+	// 其他 JSON 解析错误,提供更友好的错误提示
+	if strings.Contains(errMsg, "invalid character") ||
+		strings.Contains(errMsg, "cannot unmarshal") {
+		cleanedMsg := cleanJSONErrorMessage(errMsg)
+		return c.BadRequest("JSON 格式错误: " + cleanedMsg)
+	}
+
+	// 未知错误,直接返回原始错误信息
+	return c.BadRequest(err.Error())
+}
+
+// shouldBindAndValidate 通用的绑定和验证逻辑
+// bindFunc: 执行实际绑定操作的函数
+func shouldBindAndValidate[T any](c *HttpContext, bindFunc func(any) error) (*T, IActionResult) {
 	var target T
 
-	// 1. 绑定 JSON,增强错误处理
-	if err := c.gin.ShouldBindJSON(&target); err != nil {
-		// 检查是否为 EOF 错误(空请求体)
-		if err == io.EOF || err.Error() == "EOF" {
-			return nil, c.BadRequest("请求体不能为空,请提供有效的 JSON 数据")
-		}
-
-		// 检查是否为不完整的 JSON
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "unexpected end of JSON input") ||
-			strings.Contains(errMsg, "unexpected EOF") {
-			return nil, c.BadRequest("请求体格式不完整,请提供完整的 JSON 数据")
-		}
-
-		// 其他 JSON 解析错误,提供更友好的错误提示
-		if strings.Contains(errMsg, "invalid character") ||
-			strings.Contains(errMsg, "cannot unmarshal") {
-			cleanedMsg := cleanJSONErrorMessage(errMsg)
-			return nil, c.BadRequest("JSON 格式错误: " + cleanedMsg)
-		}
-
-		// 未知错误,直接返回原始错误信息
-		return nil, c.BadRequest(err.Error())
+	// 1. 执行绑定操作
+	if err := bindFunc(&target); err != nil {
+		return nil, handleBindError(c, err)
 	}
 
 	// 2. 使用新验证器执行验证
@@ -247,13 +249,45 @@ func BindAndValidate[T any](c *HttpContext) (*T, IActionResult) {
 	return &target, nil
 }
 
-// ValidateStruct validates a struct using registered FluentValidation validator.
-// Note: This method requires the target to be passed as a pointer and
-// a validator must be registered for the type.
-func (c *HttpContext) ValidateStruct(target interface{}) IActionResult {
-	// 由于类型推断问题，这个方法暂时不实现通用版本
-	// 建议直接使用 BindAndValidate[T] 泛型方法
-	return nil
+// ShouldBindJSON 绑定 JSON 并验证
+// 自动使用注册验证器的模式(快速失败或全量验证)
+func ShouldBindJSON[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindJSON)
+}
+
+// ShouldBindHeader 绑定 Header 并验证
+func ShouldBindHeader[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindHeader)
+}
+
+// ShouldBindQuery 绑定 Query 参数并验证
+func ShouldBindQuery[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindQuery)
+}
+
+// ShouldBindPlain 绑定 Plain 文本并验证
+func ShouldBindPlain[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindPlain)
+}
+
+// ShouldBindUri 绑定 URI 参数并验证
+func ShouldBindUri[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindUri)
+}
+
+// ShouldBindXML 绑定 XML 并验证
+func ShouldBindXML[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindXML)
+}
+
+// ShouldBindYAML 绑定 YAML 并验证
+func ShouldBindYAML[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindYAML)
+}
+
+// ShouldBindTOML 绑定 TOML 并验证
+func ShouldBindTOML[T any](c *HttpContext) (*T, IActionResult) {
+	return shouldBindAndValidate[T](c, c.gin.ShouldBindTOML)
 }
 
 // ==================== Smart Error Handling ====================

@@ -37,16 +37,18 @@ type RouteGroupBuilder struct {
 	prefix           string
 	metadata         []interface{}
 	routes           []*RouteBuilder
+	childGroups      []*RouteGroupBuilder // Track child groups
 	handlerConvertFn func(Handler) gin.HandlerFunc
 }
 
 // NewRouteGroupBuilder creates a new RouteGroupBuilder.
 func NewRouteGroupBuilder(ginGroup *gin.RouterGroup, prefix string) *RouteGroupBuilder {
 	return &RouteGroupBuilder{
-		ginGroup: ginGroup,
-		prefix:   prefix,
-		metadata: make([]interface{}, 0),
-		routes:   make([]*RouteBuilder, 0),
+		ginGroup:    ginGroup,
+		prefix:      prefix,
+		metadata:    make([]interface{}, 0),
+		routes:      make([]*RouteBuilder, 0),
+		childGroups: make([]*RouteGroupBuilder, 0),
 	}
 }
 
@@ -122,6 +124,9 @@ func (g *RouteGroupBuilder) MapGroup(prefix string, handlers ...gin.HandlerFunc)
 	// Inherit handler converter
 	newGroup.handlerConvertFn = g.handlerConvertFn
 
+	// Track child group
+	g.childGroups = append(g.childGroups, newGroup)
+
 	return newGroup
 }
 
@@ -175,9 +180,19 @@ func (g *RouteGroupBuilder) WithOpenApi(configure func(*OpenApiBuilder)) *RouteG
 	return g
 }
 
-// GetRoutes returns all routes in this group.
+// GetRoutes returns all routes in this group and its child groups recursively.
 func (g *RouteGroupBuilder) GetRoutes() []*RouteBuilder {
-	return g.routes
+	allRoutes := make([]*RouteBuilder, 0)
+
+	// Add routes from this group
+	allRoutes = append(allRoutes, g.routes...)
+
+	// Recursively add routes from child groups
+	for _, childGroup := range g.childGroups {
+		allRoutes = append(allRoutes, childGroup.GetRoutes()...)
+	}
+
+	return allRoutes
 }
 
 // OpenApiMetadata represents OpenAPI metadata.

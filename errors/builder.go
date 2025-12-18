@@ -36,6 +36,12 @@ func (e *BizError) Wrap(err error) *BizError {
 	return e
 }
 
+// WithMsg 设置或修改错误消息
+func (e *BizError) WithMsg(message string) *BizError {
+	e.Message = message
+	return e
+}
+
 // WithDetail 添加单个详细信息
 func (e *BizError) WithDetail(key string, value interface{}) *BizError {
 	if e.Details == nil {

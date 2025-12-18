@@ -676,27 +676,6 @@ web.WebP(imageData)          // image/webp
 web.BinaryImage(data, type)  // 自定义类型
 ```
 
-**OpenAPI 配置：**
-
-```go
-import "github.com/gocrud/csgo/openapi"
-
-// 二进制图片
-app.MapGet("/api/images/logo", getLogoPNG).
-    WithOpenApi(
-        openapi.OptSummary("获取Logo"),
-        openapi.OptBinaryImageResponse("image/png"),
-    )
-
-// Base64 图片
-app.MapGet("/api/images/thumbnail/:id", getThumbnail).
-    WithOpenApi(
-        openapi.OptSummary("获取缩略图"),
-        openapi.OptBase64ImageResponse(),
-        openapi.OptPath[int]("id", "图片ID"),
-    )
-```
-
 ## 控制器模式
 
 ### 定义控制器

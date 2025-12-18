@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/goccy/go-yaml"
 )
 
 // IConfigurationBuilder represents a type used to build application configuration.
@@ -307,63 +309,20 @@ func (p *YamlConfigurationProvider) Load() map[string]string {
 	return data
 }
 
-// parseSimpleYaml provides basic YAML parsing for simple key-value configs.
-// For complex YAML, use gopkg.in/yaml.v3.
+// parseSimpleYaml parses YAML content using the official go-yaml library.
+// This properly handles comments, complex structures, and all YAML features.
 func parseSimpleYaml(content []byte) map[string]interface{} {
 	result := make(map[string]interface{})
-	lines := strings.Split(string(content), "\n")
 
-	var currentPath []string
-	var indentStack []int
-
-	for _, line := range lines {
-		// Skip empty lines and comments
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		// Calculate indentation
-		indent := len(line) - len(strings.TrimLeft(line, " \t"))
-
-		// Adjust current path based on indentation
-		for len(indentStack) > 0 && indent <= indentStack[len(indentStack)-1] {
-			indentStack = indentStack[:len(indentStack)-1]
-			if len(currentPath) > 0 {
-				currentPath = currentPath[:len(currentPath)-1]
-			}
-		}
-
-		// Parse key-value
-		if idx := strings.Index(trimmed, ":"); idx > 0 {
-			key := strings.TrimSpace(trimmed[:idx])
-			value := strings.TrimSpace(trimmed[idx+1:])
-
-			if value == "" {
-				// This is a section
-				currentPath = append(currentPath, key)
-				indentStack = append(indentStack, indent)
-			} else {
-				// This is a key-value pair
-				fullPath := append(currentPath, key)
-				setNestedValue(result, fullPath, value)
-			}
-		}
+	// Use official YAML library to parse
+	err := yaml.Unmarshal(content, &result)
+	if err != nil {
+		// If parsing fails, return empty map instead of panicking
+		// The caller will handle this gracefully
+		return result
 	}
 
 	return result
-}
-
-// setNestedValue sets a value in a nested map.
-func setNestedValue(m map[string]interface{}, path []string, value string) {
-	for i := 0; i < len(path)-1; i++ {
-		key := path[i]
-		if _, ok := m[key]; !ok {
-			m[key] = make(map[string]interface{})
-		}
-		m = m[key].(map[string]interface{})
-	}
-	m[path[len(path)-1]] = value
 }
 
 // EnvironmentVariablesConfigurationSource represents environment variables configuration source.

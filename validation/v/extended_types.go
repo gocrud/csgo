@@ -25,6 +25,7 @@ func (i *Int8) In(vals ...int) *Int8 {
 }
 func (i *Int8) Msg(msg string) *Int8      { validation.SetLastRuleMsg(unsafe.Pointer(i), msg); return i }
 func (i *Int8) MsgGroup(msg string) *Int8 { validation.SetGroupMsg(unsafe.Pointer(i), msg); return i }
+func (i *Int8) Value() int8               { return int8(*i) }
 
 type Int16 int16
 
@@ -42,6 +43,7 @@ func (i *Int16) In(vals ...int) *Int16 {
 }
 func (i *Int16) Msg(msg string) *Int16      { validation.SetLastRuleMsg(unsafe.Pointer(i), msg); return i }
 func (i *Int16) MsgGroup(msg string) *Int16 { validation.SetGroupMsg(unsafe.Pointer(i), msg); return i }
+func (i *Int16) Value() int16               { return int16(*i) }
 
 type Int32 int32
 
@@ -59,6 +61,7 @@ func (i *Int32) In(vals ...int) *Int32 {
 }
 func (i *Int32) Msg(msg string) *Int32      { validation.SetLastRuleMsg(unsafe.Pointer(i), msg); return i }
 func (i *Int32) MsgGroup(msg string) *Int32 { validation.SetGroupMsg(unsafe.Pointer(i), msg); return i }
+func (i *Int32) Value() int32               { return int32(*i) }
 
 type Int64 int64
 
@@ -79,6 +82,7 @@ func (i *Int64) In(vals ...int64) *Int64 {
 }
 func (i *Int64) Msg(msg string) *Int64      { validation.SetLastRuleMsg(unsafe.Pointer(i), msg); return i }
 func (i *Int64) MsgGroup(msg string) *Int64 { validation.SetGroupMsg(unsafe.Pointer(i), msg); return i }
+func (i *Int64) Value() int64               { return int64(*i) }
 
 type Uint uint
 
@@ -96,6 +100,7 @@ func (i *Uint) In(vals ...uint) *Uint {
 }
 func (i *Uint) Msg(msg string) *Uint      { validation.SetLastRuleMsg(unsafe.Pointer(i), msg); return i }
 func (i *Uint) MsgGroup(msg string) *Uint { validation.SetGroupMsg(unsafe.Pointer(i), msg); return i }
+func (i *Uint) Value() uint               { return uint(*i) }
 
 type Uint8 uint8
 
@@ -113,6 +118,7 @@ func (i *Uint8) In(vals ...uint) *Uint8 {
 }
 func (i *Uint8) Msg(msg string) *Uint8      { validation.SetLastRuleMsg(unsafe.Pointer(i), msg); return i }
 func (i *Uint8) MsgGroup(msg string) *Uint8 { validation.SetGroupMsg(unsafe.Pointer(i), msg); return i }
+func (i *Uint8) Value() uint8               { return uint8(*i) }
 
 type Uint16 uint16
 
@@ -142,6 +148,7 @@ func (i *Uint16) MsgGroup(msg string) *Uint16 {
 	validation.SetGroupMsg(unsafe.Pointer(i), msg)
 	return i
 }
+func (i *Uint16) Value() uint16 { return uint16(*i) }
 
 type Uint32 uint32
 
@@ -171,6 +178,7 @@ func (i *Uint32) MsgGroup(msg string) *Uint32 {
 	validation.SetGroupMsg(unsafe.Pointer(i), msg)
 	return i
 }
+func (i *Uint32) Value() uint32 { return uint32(*i) }
 
 type Uint64 uint64
 
@@ -200,6 +208,7 @@ func (i *Uint64) MsgGroup(msg string) *Uint64 {
 	validation.SetGroupMsg(unsafe.Pointer(i), msg)
 	return i
 }
+func (i *Uint64) Value() uint64 { return uint64(*i) }
 
 // ==================== Floats ====================
 
@@ -226,6 +235,7 @@ func (f *Float32) MsgGroup(msg string) *Float32 {
 	validation.SetGroupMsg(unsafe.Pointer(f), msg)
 	return f
 }
+func (f *Float32) Value() float32 { return float32(*f) }
 
 type Float64 float64
 
@@ -250,6 +260,7 @@ func (f *Float64) MsgGroup(msg string) *Float64 {
 	validation.SetGroupMsg(unsafe.Pointer(f), msg)
 	return f
 }
+func (f *Float64) Value() float64 { return float64(*f) }
 
 // ==================== Bool ====================
 
@@ -259,6 +270,7 @@ func (b *Bool) True() *Bool               { validation.RecordRule(unsafe.Pointer
 func (b *Bool) False() *Bool              { validation.RecordRule(unsafe.Pointer(b), "false"); return b }
 func (b *Bool) Msg(msg string) *Bool      { validation.SetLastRuleMsg(unsafe.Pointer(b), msg); return b }
 func (b *Bool) MsgGroup(msg string) *Bool { validation.SetGroupMsg(unsafe.Pointer(b), msg); return b }
+func (b *Bool) Value() bool               { return bool(*b) }
 
 // ==================== Generic Slice ====================
 
@@ -306,6 +318,10 @@ func (s *Slice[T]) MsgGroup(msg string) *Slice[T] {
 	return s
 }
 
+func (s *Slice[T]) Value() []T {
+	return []T(*s)
+}
+
 // ==================== Time ====================
 
 type Time time.Time
@@ -324,3 +340,4 @@ func (t *Time) Required() *Time {
 }
 func (t *Time) Msg(msg string) *Time      { validation.SetLastRuleMsg(unsafe.Pointer(t), msg); return t }
 func (t *Time) MsgGroup(msg string) *Time { validation.SetGroupMsg(unsafe.Pointer(t), msg); return t }
+func (t *Time) Value() time.Time          { return time.Time(*t) }
