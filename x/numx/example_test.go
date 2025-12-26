@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gocrud/csgo/numx"
+	"github.com/gocrud/csgo/x/numx"
 )
 
 // Example demonstrates basic usage of numx types
