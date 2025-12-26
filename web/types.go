@@ -1,9 +1,9 @@
 package web
 
-// M is a shortcut for map[string]interface{}, similar to gin.H
-// It provides a convenient way to create map responses without typing the full type signature.
+// M 是 map[string]interface{} 的简写，类似于 gin.H。
+// 提供了一种方便的方式来创建 map 响应，而无需输入完整的类型签名。
 //
-// Example:
+// 示例：
 //
 //	return web.Ok(web.M{
 //	    "name": "John",

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gocrud/csgo/configuration"
+	"github.com/gocrud/csgo/config"
 	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/hosting"
 	"github.com/gocrud/csgo/web/router"
@@ -18,7 +18,7 @@ import (
 // Corresponds to .NET WebApplicationBuilder.
 type WebApplicationBuilder struct {
 	Services      di.IServiceCollection
-	Configuration configuration.IConfigurationManager
+	Configuration config.IConfigurationManager
 	Environment   hosting.IHostEnvironment
 	Host          *ConfigureHostBuilder
 	WebHost       *ConfigureWebHostBuilder

@@ -2,185 +2,176 @@ package errors
 
 import (
 	"fmt"
-	"strings"
 )
 
-// BizError 业务错误
-type BizError struct {
-	Code    string                 // 错误码，如 "USER.NOT_FOUND"
-	Message string                 // 错误消息
-	Cause   error                  // 原始错误（支持错误链）
-	Details map[string]interface{} // 额外详细信息
+// ErrorCategory 错误分类
+type ErrorCategory string
+
+const (
+	CategoryBusiness   ErrorCategory = "BUSINESS"   // 业务错误
+	CategorySystem     ErrorCategory = "SYSTEM"     // 系统错误
+	CategoryValidation ErrorCategory = "VALIDATION" // 验证错误
+	CategoryAuth       ErrorCategory = "AUTH"       // 认证授权错误
+)
+
+// Error 表示一个结构化的错误
+type Error struct {
+	category ErrorCategory  // 错误分类
+	code     string         // 完整错误码，如 "USER.NOT_FOUND"
+	message  string         // 错误消息
+	cause    error          // 原始错误（支持错误链）
+	details  map[string]any // 额外详细信息
+	httpCode int            // HTTP 状态码
 }
 
 // Error 实现 error 接口
-func (e *BizError) Error() string {
-	if e.Code != "" {
-		msg := fmt.Sprintf("[%s] %s", e.Code, e.Message)
-		if e.Cause != nil {
-			msg += fmt.Sprintf(": %v", e.Cause)
+func (e *Error) Error() string {
+	if e.code != "" {
+		msg := fmt.Sprintf("[%s] %s", e.code, e.message)
+		if e.cause != nil {
+			msg += fmt.Sprintf(": %v", e.cause)
 		}
 		return msg
 	}
-	return e.Message
+	return e.message
 }
 
 // Unwrap 实现 Go 1.13+ 错误链支持
-func (e *BizError) Unwrap() error {
-	return e.Cause
+func (e *Error) Unwrap() error {
+	return e.cause
 }
 
-// Wrap 包装原始错误
-func (e *BizError) Wrap(err error) *BizError {
-	e.Cause = err
-	return e
+// Code 返回错误码
+func (e *Error) Code() string {
+	return e.code
 }
 
-// WithMsg 设置或修改错误消息
-func (e *BizError) WithMsg(message string) *BizError {
-	e.Message = message
-	return e
+// Message 返回错误消息
+func (e *Error) Message() string {
+	return e.message
 }
 
-// WithDetail 添加单个详细信息
-func (e *BizError) WithDetail(key string, value interface{}) *BizError {
-	if e.Details == nil {
-		e.Details = make(map[string]interface{})
+// HTTPCode 返回 HTTP 状态码
+func (e *Error) HTTPCode() int {
+	return e.httpCode
+}
+
+// Details 返回详细信息
+func (e *Error) Details() map[string]any {
+	if e.details == nil {
+		return make(map[string]any)
 	}
-	e.Details[key] = value
-	return e
+	// 返回副本，避免外部修改
+	result := make(map[string]any, len(e.details))
+	for k, v := range e.details {
+		result[k] = v
+	}
+	return result
 }
 
-// WithDetails 批量添加详细信息
-func (e *BizError) WithDetails(details map[string]interface{}) *BizError {
-	if e.Details == nil {
-		e.Details = make(map[string]interface{})
+// Category 返回错误分类
+func (e *Error) Category() ErrorCategory {
+	return e.category
+}
+
+// Wrap 包装原始错误（返回新实例）
+func (e *Error) Wrap(err error) *Error {
+	newErr := e.clone()
+	newErr.cause = err
+	return newErr
+}
+
+// WithMsg 覆盖错误消息（返回新实例）
+func (e *Error) WithMsg(message string) *Error {
+	newErr := e.clone()
+	newErr.message = message
+	return newErr
+}
+
+// WithMsgf 使用格式化字符串覆盖错误消息（返回新实例）
+func (e *Error) WithMsgf(format string, args ...any) *Error {
+	return e.WithMsg(fmt.Sprintf(format, args...))
+}
+
+// AppendMsg 追加消息（返回新实例）
+func (e *Error) AppendMsg(suffix string) *Error {
+	newErr := e.clone()
+	newErr.message = e.message + suffix
+	return newErr
+}
+
+// PrependMsg 前置消息（返回新实例）
+func (e *Error) PrependMsg(prefix string) *Error {
+	newErr := e.clone()
+	newErr.message = prefix + e.message
+	return newErr
+}
+
+// WithDetail 添加单个详细信息（返回新实例）
+func (e *Error) WithDetail(key string, value any) *Error {
+	newErr := e.clone()
+	if newErr.details == nil {
+		newErr.details = make(map[string]any)
+	}
+	newErr.details[key] = value
+	return newErr
+}
+
+// WithDetails 批量添加详细信息（返回新实例）
+func (e *Error) WithDetails(details map[string]any) *Error {
+	newErr := e.clone()
+	if newErr.details == nil {
+		newErr.details = make(map[string]any)
 	}
 	for k, v := range details {
-		e.Details[k] = v
+		newErr.details[k] = v
 	}
-	return e
+	return newErr
 }
 
-// ErrorBuilder 错误码构建器
-type ErrorBuilder struct {
-	module string
+// WithHTTPCode 设置 HTTP 状态码（返回新实例）
+func (e *Error) WithHTTPCode(code int) *Error {
+	newErr := e.clone()
+	newErr.httpCode = code
+	return newErr
 }
 
-// Business 创建业务错误构建器
-// 用法: errors.Business("USER").NotFound("用户不存在")
-func Business(module string) *ErrorBuilder {
-	return &ErrorBuilder{module: strings.ToUpper(module)}
-}
-
-// NotFound 资源不存在
-func (b *ErrorBuilder) NotFound(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.NOT_FOUND", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
+// clone 克隆错误对象
+func (e *Error) clone() *Error {
+	newErr := &Error{
+		category: e.category,
+		code:     e.code,
+		message:  e.message,
+		cause:    e.cause,
+		httpCode: e.httpCode,
 	}
-}
-
-// AlreadyExists 资源已存在
-func (b *ErrorBuilder) AlreadyExists(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.ALREADY_EXISTS", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
+	if e.details != nil {
+		newErr.details = make(map[string]any, len(e.details))
+		for k, v := range e.details {
+			newErr.details[k] = v
+		}
 	}
+	return newErr
 }
 
-// InvalidStatus 状态无效
-func (b *ErrorBuilder) InvalidStatus(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.INVALID_STATUS", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
+// New 创建自定义错误
+func New(code string, message string, httpCode int) *Error {
+	return &Error{
+		category: CategoryBusiness,
+		code:     code,
+		message:  message,
+		httpCode: httpCode,
+		details:  make(map[string]any),
 	}
 }
 
-// InvalidParam 参数无效
-func (b *ErrorBuilder) InvalidParam(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.INVALID_PARAM", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// PermissionDenied 权限不足
-func (b *ErrorBuilder) PermissionDenied(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.PERMISSION_DENIED", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// OperationFailed 操作失败
-func (b *ErrorBuilder) OperationFailed(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.OPERATION_FAILED", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// Expired 资源已过期
-func (b *ErrorBuilder) Expired(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.EXPIRED", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// Locked 资源已锁定
-func (b *ErrorBuilder) Locked(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.LOCKED", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// LimitExceeded 超出限制
-func (b *ErrorBuilder) LimitExceeded(message string) *BizError {
-	return &BizError{
-		Code:    fmt.Sprintf("%s.LIMIT_EXCEEDED", b.module),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// Custom 自定义语义错误码
-// semantic 参数应该使用大写下划线命名，如 "AMOUNT_EXCEEDED"
-func (b *ErrorBuilder) Custom(semantic, message string) *BizError {
-	semantic = strings.ToUpper(semantic)
-	return &BizError{
-		Code:    fmt.Sprintf("%s.%s", b.module, semantic),
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// New 直接创建业务错误（不使用构建器）
-// 返回 *BizError，支持链式调用 Wrap、WithDetail 等方法
-func New(code, message string) *BizError {
-	return &BizError{
-		Code:    code,
-		Message: message,
-		Details: make(map[string]interface{}),
-	}
-}
-
-// Newf 使用格式化消息创建业务错误
-// 返回 *BizError，支持链式调用 Wrap、WithDetail 等方法
-func Newf(code, format string, args ...interface{}) *BizError {
-	return &BizError{
-		Code:    code,
-		Message: fmt.Sprintf(format, args...),
-		Details: make(map[string]interface{}),
+// Newf 使用格式化消息创建自定义错误
+func Newf(code string, httpCode int, format string, args ...any) *Error {
+	return &Error{
+		category: CategoryBusiness,
+		code:     code,
+		message:  fmt.Sprintf(format, args...),
+		httpCode: httpCode,
+		details:  make(map[string]any),
 	}
 }

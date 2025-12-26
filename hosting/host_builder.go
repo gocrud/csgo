@@ -4,15 +4,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gocrud/csgo/configuration"
+	"github.com/gocrud/csgo/config"
 	"github.com/gocrud/csgo/di"
 )
 
 // IHostBuilder provides a mechanism for configuring and creating a host.
 type IHostBuilder interface {
 	ConfigureServices(configure func(services di.IServiceCollection)) IHostBuilder
-	ConfigureAppConfiguration(configure func(config configuration.IConfigurationBuilder)) IHostBuilder
-	ConfigureHostConfiguration(configure func(config configuration.IConfigurationBuilder)) IHostBuilder
+	ConfigureAppConfiguration(configure func(config config.IConfigurationBuilder)) IHostBuilder
+	ConfigureHostConfiguration(configure func(config config.IConfigurationBuilder)) IHostBuilder
 	Build() IHost
 }
 
@@ -21,9 +21,9 @@ type IHostBuilder interface {
 type HostBuilder struct {
 	// Public properties (exposed like .NET)
 	Services             di.IServiceCollection
-	Configuration        configuration.IConfigurationManager
+	Configuration        config.IConfigurationManager
 	Environment          *Environment
-	configurationActions []func(configuration.IConfigurationBuilder)
+	configurationActions []func(config.IConfigurationBuilder)
 }
 
 // CreateDefaultBuilder creates a host builder with default configuration.
@@ -32,7 +32,7 @@ func CreateDefaultBuilder(args ...string) *HostBuilder {
 	env := NewEnvironment()
 
 	// Create ConfigurationManager (allows dynamic configuration)
-	configManager := configuration.NewConfigurationManager()
+	configManager := config.NewConfigurationManager()
 
 	// Add default configuration sources
 	configManager.
@@ -45,8 +45,8 @@ func CreateDefaultBuilder(args ...string) *HostBuilder {
 	services := di.NewServiceCollection()
 
 	// Register core services
-	services.Add(func() configuration.IConfiguration { return configManager })
-	services.Add(func() configuration.IConfigurationManager { return configManager })
+	services.Add(func() config.IConfiguration { return configManager })
+	services.Add(func() config.IConfigurationManager { return configManager })
 	services.Add(func() *Environment { return env })
 	services.Add(func() IHostApplicationLifetime { return NewApplicationLifetime() })
 
@@ -54,7 +54,7 @@ func CreateDefaultBuilder(args ...string) *HostBuilder {
 		Services:             services,
 		Configuration:        configManager,
 		Environment:          env,
-		configurationActions: make([]func(configuration.IConfigurationBuilder), 0),
+		configurationActions: make([]func(config.IConfigurationBuilder), 0),
 	}
 }
 
@@ -78,7 +78,7 @@ func (b *HostBuilder) ConfigureServices(configure func(services di.IServiceColle
 }
 
 // ConfigureAppConfiguration adds a delegate for configuring the application configuration.
-func (b *HostBuilder) ConfigureAppConfiguration(configure func(config configuration.IConfigurationBuilder)) IHostBuilder {
+func (b *HostBuilder) ConfigureAppConfiguration(configure func(config config.IConfigurationBuilder)) IHostBuilder {
 	// Support multiple calls, accumulate configuration actions
 	b.configurationActions = append(b.configurationActions, configure)
 
@@ -89,7 +89,7 @@ func (b *HostBuilder) ConfigureAppConfiguration(configure func(config configurat
 }
 
 // ConfigureHostConfiguration adds a delegate for configuring the host configuration.
-func (b *HostBuilder) ConfigureHostConfiguration(configure func(config configuration.IConfigurationBuilder)) IHostBuilder {
+func (b *HostBuilder) ConfigureHostConfiguration(configure func(config config.IConfigurationBuilder)) IHostBuilder {
 	// For now, configuration is already built
 	// In a full implementation, this would rebuild the configuration
 	return b

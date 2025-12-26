@@ -6,42 +6,42 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler represents a unified handler type.
-// Uses 'any' to allow any handler type, converted via handlerConvertFn.
+// Handler 表示统一的处理器类型。
+// 使用 'any' 允许任何处理器类型，通过 handlerConvertFn 转换。
 type Handler = any
 
-// IEndpointRouteBuilder defines a contract for a route builder in an application.
+// IEndpointRouteBuilder 定义应用程序中路由构建器的契约。
 type IEndpointRouteBuilder interface {
-	// MapGet registers a GET endpoint.
-	MapGet(pattern string, handlers ...Handler) IEndpointConventionBuilder
+	// GET 注册 GET 端点。
+	GET(pattern string, handlers ...Handler) IEndpointConventionBuilder
 
-	// MapPost registers a POST endpoint.
-	MapPost(pattern string, handlers ...Handler) IEndpointConventionBuilder
+	// POST 注册 POST 端点。
+	POST(pattern string, handlers ...Handler) IEndpointConventionBuilder
 
-	// MapPut registers a PUT endpoint.
-	MapPut(pattern string, handlers ...Handler) IEndpointConventionBuilder
+	// PUT 注册 PUT 端点。
+	PUT(pattern string, handlers ...Handler) IEndpointConventionBuilder
 
-	// MapDelete registers a DELETE endpoint.
-	MapDelete(pattern string, handlers ...Handler) IEndpointConventionBuilder
+	// DELETE 注册 DELETE 端点。
+	DELETE(pattern string, handlers ...Handler) IEndpointConventionBuilder
 
-	// MapPatch registers a PATCH endpoint.
-	MapPatch(pattern string, handlers ...Handler) IEndpointConventionBuilder
+	// PATCH 注册 PATCH 端点。
+	PATCH(pattern string, handlers ...Handler) IEndpointConventionBuilder
 
-	// MapGroup creates a route group.
-	MapGroup(prefix string, handlers ...gin.HandlerFunc) *RouteGroupBuilder
+	// Group 创建路由组。
+	Group(prefix string, handlers ...gin.HandlerFunc) *RouteGroupBuilder
 }
 
-// RouteGroupBuilder represents a group of endpoints with a common prefix.
+// RouteGroupBuilder 表示具有公共前缀的端点组。
 type RouteGroupBuilder struct {
 	ginGroup         *gin.RouterGroup
 	prefix           string
 	metadata         []interface{}
 	routes           []*RouteBuilder
-	childGroups      []*RouteGroupBuilder // Track child groups
+	childGroups      []*RouteGroupBuilder // 跟踪子组
 	handlerConvertFn func(Handler) gin.HandlerFunc
 }
 
-// NewRouteGroupBuilder creates a new RouteGroupBuilder.
+// NewRouteGroupBuilder 创建新的 RouteGroupBuilder。
 func NewRouteGroupBuilder(ginGroup *gin.RouterGroup, prefix string) *RouteGroupBuilder {
 	return &RouteGroupBuilder{
 		ginGroup:    ginGroup,
@@ -52,20 +52,20 @@ func NewRouteGroupBuilder(ginGroup *gin.RouterGroup, prefix string) *RouteGroupB
 	}
 }
 
-// SetHandlerConverter sets the handler converter function.
-// This is used to convert custom handler types to gin.HandlerFunc.
+// SetHandlerConverter 设置处理器转换函数。
+// 用于将自定义处理器类型转换为 gin.HandlerFunc。
 func (g *RouteGroupBuilder) SetHandlerConverter(fn func(Handler) gin.HandlerFunc) {
 	g.handlerConvertFn = fn
 }
 
-// convertHandler converts a Handler to gin.HandlerFunc.
+// convertHandler 将 Handler 转换为 gin.HandlerFunc。
 func (g *RouteGroupBuilder) convertHandler(h Handler) gin.HandlerFunc {
-	// If a converter is set, use it
+	// 如果设置了转换器，使用它
 	if g.handlerConvertFn != nil {
 		return g.handlerConvertFn(h)
 	}
 
-	// Default: assume it's already a gin.HandlerFunc
+	// 默认：假设它已经是 gin.HandlerFunc
 	if ginHandler, ok := h.(gin.HandlerFunc); ok {
 		return ginHandler
 	}
@@ -73,10 +73,10 @@ func (g *RouteGroupBuilder) convertHandler(h Handler) gin.HandlerFunc {
 		return ginHandler
 	}
 
-	panic("unsupported handler type: set handler converter or use gin.HandlerFunc")
+	panic("不支持的处理器类型：请设置处理器转换器或使用 gin.HandlerFunc")
 }
 
-// convertHandlers converts multiple Handlers to gin.HandlerFunc slice.
+// convertHandlers 将多个 Handler 转换为 gin.HandlerFunc 切片。
 func (g *RouteGroupBuilder) convertHandlers(handlers ...Handler) []gin.HandlerFunc {
 	result := make([]gin.HandlerFunc, len(handlers))
 	for i, h := range handlers {
@@ -85,94 +85,94 @@ func (g *RouteGroupBuilder) convertHandlers(handlers ...Handler) []gin.HandlerFu
 	return result
 }
 
-// MapGet registers a GET endpoint.
-// Supports multiple handler types when handler converter is set.
-func (g *RouteGroupBuilder) MapGet(pattern string, handlers ...Handler) IEndpointConventionBuilder {
+// GET 注册 GET 端点。
+// 设置处理器转换器时支持多种处理器类型。
+func (g *RouteGroupBuilder) GET(pattern string, handlers ...Handler) IEndpointConventionBuilder {
 	return g.mapRoute("GET", pattern, handlers...)
 }
 
-// MapPost registers a POST endpoint.
-func (g *RouteGroupBuilder) MapPost(pattern string, handlers ...Handler) IEndpointConventionBuilder {
+// POST 注册 POST 端点。
+func (g *RouteGroupBuilder) POST(pattern string, handlers ...Handler) IEndpointConventionBuilder {
 	return g.mapRoute("POST", pattern, handlers...)
 }
 
-// MapPut registers a PUT endpoint.
-func (g *RouteGroupBuilder) MapPut(pattern string, handlers ...Handler) IEndpointConventionBuilder {
+// PUT 注册 PUT 端点。
+func (g *RouteGroupBuilder) PUT(pattern string, handlers ...Handler) IEndpointConventionBuilder {
 	return g.mapRoute("PUT", pattern, handlers...)
 }
 
-// MapDelete registers a DELETE endpoint.
-func (g *RouteGroupBuilder) MapDelete(pattern string, handlers ...Handler) IEndpointConventionBuilder {
+// DELETE 注册 DELETE 端点。
+func (g *RouteGroupBuilder) DELETE(pattern string, handlers ...Handler) IEndpointConventionBuilder {
 	return g.mapRoute("DELETE", pattern, handlers...)
 }
 
-// MapPatch registers a PATCH endpoint.
-func (g *RouteGroupBuilder) MapPatch(pattern string, handlers ...Handler) IEndpointConventionBuilder {
+// PATCH 注册 PATCH 端点。
+func (g *RouteGroupBuilder) PATCH(pattern string, handlers ...Handler) IEndpointConventionBuilder {
 	return g.mapRoute("PATCH", pattern, handlers...)
 }
 
-// MapGroup creates a nested route group.
-func (g *RouteGroupBuilder) MapGroup(prefix string, handlers ...gin.HandlerFunc) *RouteGroupBuilder {
+// Group 创建嵌套路由组。
+func (g *RouteGroupBuilder) Group(prefix string, handlers ...gin.HandlerFunc) *RouteGroupBuilder {
 	newGinGroup := g.ginGroup.Group(prefix, handlers...)
 	newPrefix := path.Join(g.prefix, prefix)
 
 	newGroup := NewRouteGroupBuilder(newGinGroup, newPrefix)
 
-	// Inherit parent metadata
+	// 继承父级元数据
 	newGroup.metadata = append([]interface{}{}, g.metadata...)
 
-	// Inherit handler converter
+	// 继承处理器转换器
 	newGroup.handlerConvertFn = g.handlerConvertFn
 
-	// Track child group
+	// 跟踪子组
 	g.childGroups = append(g.childGroups, newGroup)
 
 	return newGroup
 }
 
-// mapRoute is the internal method to register a route.
+// mapRoute 是注册路由的内部方法。
 func (g *RouteGroupBuilder) mapRoute(method, pattern string, handlers ...Handler) IEndpointConventionBuilder {
-	// Convert handlers
+	// 转换处理器
 	ginHandlers := g.convertHandlers(handlers...)
 
-	// Register with Gin
+	// 在 Gin 中注册
 	g.ginGroup.Handle(method, pattern, ginHandlers...)
 
-	// Calculate full path
+	// 计算完整路径
 	fullPath := path.Join(g.prefix, pattern)
 
-	// Create route builder
+	// 创建路由构建器
 	rb := NewRouteBuilder(method, fullPath)
 
-	// Inherit group metadata
+	// 继承组元数据
 	rb.metadata = append([]interface{}{}, g.metadata...)
 
-	// Inherit OpenAPI setting from group
-	// If the group has enabled OpenAPI, all child routes automatically inherit it
+	// 从组继承 OpenAPI 设置
+	// 如果组启用了 OpenAPI，所有子路由将自动继承它
 	for _, meta := range g.metadata {
 		if openApiMeta, ok := meta.(*OpenApiMetadata); ok && openApiMeta.Enabled {
 			rb.openApiEnabled = true
 		}
 		if groupConfig, ok := meta.(*GroupOpenApiConfig); ok && groupConfig.Configure != nil {
-			// Apply group's OpenAPI configuration to this route
+			// 将组的 OpenAPI 配置应用到此路由
 			rb.openApiEnabled = true
 			builder := &OpenApiBuilder{builder: rb}
 			groupConfig.Configure(builder)
 		}
 	}
 
-	// Store route
+	// 存储路由
 	g.routes = append(g.routes, rb)
 
 	return rb
 }
 
-// WithOpenApi enables OpenAPI documentation for this group.
-// Configuration will be applied to all routes created in this group.
+// WithOpenApi 为此组启用 OpenAPI 文档。
+// 配置将应用于此组中创建的所有路由。
 func (g *RouteGroupBuilder) WithOpenApi(configure func(*OpenApiBuilder)) *RouteGroupBuilder {
 	g.metadata = append(g.metadata, &OpenApiMetadata{Enabled: true})
 
-	// Store configuration in metadata to be applied to child routes
+	// 将配置存储在元数据中以应用于子路由
 	if configure != nil {
 		g.metadata = append(g.metadata, &GroupOpenApiConfig{Configure: configure})
 	}
@@ -180,14 +180,14 @@ func (g *RouteGroupBuilder) WithOpenApi(configure func(*OpenApiBuilder)) *RouteG
 	return g
 }
 
-// GetRoutes returns all routes in this group and its child groups recursively.
+// GetRoutes 递归返回此组及其子组中的所有路由。
 func (g *RouteGroupBuilder) GetRoutes() []*RouteBuilder {
 	allRoutes := make([]*RouteBuilder, 0)
 
-	// Add routes from this group
+	// 添加此组中的路由
 	allRoutes = append(allRoutes, g.routes...)
 
-	// Recursively add routes from child groups
+	// 递归添加子组中的路由
 	for _, childGroup := range g.childGroups {
 		allRoutes = append(allRoutes, childGroup.GetRoutes()...)
 	}
@@ -195,22 +195,22 @@ func (g *RouteGroupBuilder) GetRoutes() []*RouteBuilder {
 	return allRoutes
 }
 
-// OpenApiMetadata represents OpenAPI metadata.
+// OpenApiMetadata 表示 OpenAPI 元数据。
 type OpenApiMetadata struct {
 	Enabled bool
 }
 
-// GroupOpenApiConfig holds OpenAPI configuration to be applied to group routes.
+// GroupOpenApiConfig 保存要应用于组路由的 OpenAPI 配置。
 type GroupOpenApiConfig struct {
 	Configure func(*OpenApiBuilder)
 }
 
-// AuthorizationMetadata represents authorization metadata.
+// AuthorizationMetadata 表示授权元数据。
 type AuthorizationMetadata struct {
 	Policies []string
 }
 
-// TagsMetadata represents OpenAPI tags metadata.
+// TagsMetadata 表示 OpenAPI 标签元数据。
 type TagsMetadata struct {
 	Tags []string
 }

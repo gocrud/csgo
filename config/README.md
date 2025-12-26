@@ -25,7 +25,7 @@ CSGO 的配置系统提供了强大而灵活的配置管理功能，支持多种
 package main
 
 import (
-    "github.com/gocrud/csgo/configuration"
+    "github.com/gocrud/csgo/config"
     "github.com/gocrud/csgo/web"
 )
 
@@ -44,8 +44,8 @@ func main() {
     builder := web.CreateBuilder()
     
     // 2. 注册配置（一行代码搞定！）
-    configuration.Configure[AppSettings](builder.Services, "app")
-    configuration.Configure[ServerSettings](builder.Services, "server")
+    config.Configure[AppSettings](builder.Services, "app")
+    config.Configure[ServerSettings](builder.Services, "server")
     
     // 3. 注册服务（自动注入配置）
     builder.Services.Add(NewMyService)
@@ -56,13 +56,13 @@ func main() {
 
 // 4. 在服务中使用配置
 type MyService struct {
-    appConfig    configuration.IOptionsMonitor[AppSettings]
-    serverConfig configuration.IOptionsMonitor[ServerSettings]
+    appConfig    config.IOptionsMonitor[AppSettings]
+    serverConfig config.IOptionsMonitor[ServerSettings]
 }
 
 func NewMyService(
-    appConfig configuration.IOptionsMonitor[AppSettings],
-    serverConfig configuration.IOptionsMonitor[ServerSettings],
+    appConfig config.IOptionsMonitor[AppSettings],
+    serverConfig config.IOptionsMonitor[ServerSettings],
 ) *MyService {
     return &MyService{
         appConfig:    appConfig,
@@ -527,17 +527,17 @@ type DatabaseSettings struct {
 #### 2. 注册配置
 
 ```go
-import "github.com/gocrud/csgo/configuration"
+import "github.com/gocrud/csgo/config"
 
 func main() {
     builder := web.CreateBuilder()
     
     // 方式 A：基本用法
-    configuration.Configure[AppSettings](builder.Services, "app")
-    configuration.Configure[DatabaseSettings](builder.Services, "database")
+    config.Configure[AppSettings](builder.Services, "app")
+    config.Configure[DatabaseSettings](builder.Services, "database")
     
     // 方式 B：带默认值
-    configuration.ConfigureWithDefaults[AppSettings](builder.Services, "app", func() *AppSettings {
+    config.ConfigureWithDefaults[AppSettings](builder.Services, "app", func() *AppSettings {
         return &AppSettings{
             Name:    "MyApp",
             Version: "1.0.0",
@@ -546,7 +546,7 @@ func main() {
     })
     
     // 方式 C：带验证
-    configuration.ConfigureWithValidation[DatabaseSettings](builder.Services, "database", 
+    config.ConfigureWithValidation[DatabaseSettings](builder.Services, "database", 
         func(opts *DatabaseSettings) error {
             if opts.Host == "" {
                 return fmt.Errorf("database host is required")
@@ -586,12 +586,12 @@ func main() {
 
 ```go
 type UserService struct {
-    dbConfig configuration.IOptionsMonitor[DatabaseSettings]
+    dbConfig config.IOptionsMonitor[DatabaseSettings]
     logger   logging.ILogger
 }
 
 func NewUserService(
-    dbConfig configuration.IOptionsMonitor[DatabaseSettings],
+    dbConfig config.IOptionsMonitor[DatabaseSettings],
     logger logging.ILogger,
 ) *UserService {
     return &UserService{
@@ -653,8 +653,8 @@ func main() {
     builder := web.CreateBuilder()
     
     // 注册配置
-    configuration.Configure[AppSettings](builder.Services, "app")
-    configuration.Configure[DatabaseSettings](builder.Services, "database")
+    config.Configure[AppSettings](builder.Services, "app")
+    config.Configure[DatabaseSettings](builder.Services, "database")
     
     // 注册服务（自动注入配置）
     builder.Services.Add(NewUserService)    // 自动注入 IOptionsMonitor[DatabaseSettings]
@@ -701,7 +701,7 @@ func NewMyService(options *ServiceOptions) *MyService {
 }
 
 // 手动注册
-builder.Services.Add(func(config configuration.IConfiguration) *MyService {
+builder.Services.Add(func(config config.IConfiguration) *MyService {
     options := NewServiceOptions()
     
     // 从配置绑定（覆盖默认值）
@@ -764,16 +764,16 @@ type CacheSettings struct {
 }
 
 // 2. 注册配置（自动支持热更新）
-configuration.Configure[CacheSettings](builder.Services, "cache")
+config.Configure[CacheSettings](builder.Services, "cache")
 
 // 3. 在服务中使用（自动获取最新配置）
 type CacheService struct {
-    config configuration.IOptionsMonitor[CacheSettings]
+    config config.IOptionsMonitor[CacheSettings]
     logger logging.ILogger
 }
 
 func NewCacheService(
-    config configuration.IOptionsMonitor[CacheSettings],
+    config config.IOptionsMonitor[CacheSettings],
     logger logging.ILogger,
 ) *CacheService {
     svc := &CacheService{
@@ -852,14 +852,14 @@ builder.Configuration.OnChange(func() {
 
 ```go
 type CacheService struct {
-    config configuration.IConfiguration
+    config config.IConfiguration
     mu     sync.RWMutex
     
     timeout time.Duration
     maxSize int
 }
 
-func NewCacheService(config configuration.IConfiguration) *CacheService {
+func NewCacheService(config config.IConfiguration) *CacheService {
     svc := &CacheService{
         config: config,
     }
@@ -1097,7 +1097,7 @@ connStr := fmt.Sprintf("postgres://%s:%s@%s/%s",
 
 ```go
 // ✅ 最佳实践：使用 Configure[T] 模式
-import "github.com/gocrud/csgo/configuration"
+import "github.com/gocrud/csgo/config"
 
 // 定义配置结构
 type ServerConfig struct {
@@ -1112,15 +1112,15 @@ type DatabaseConfig struct {
 }
 
 // 注册配置
-configuration.Configure[ServerConfig](builder.Services, "server")
-configuration.Configure[DatabaseConfig](builder.Services, "database")
+config.Configure[ServerConfig](builder.Services, "server")
+config.Configure[DatabaseConfig](builder.Services, "database")
 
 // 在服务中使用
 type MyService struct {
-    serverConfig configuration.IOptionsMonitor[ServerConfig]
+    serverConfig config.IOptionsMonitor[ServerConfig]
 }
 
-func NewMyService(serverConfig configuration.IOptionsMonitor[ServerConfig]) *MyService {
+func NewMyService(serverConfig config.IOptionsMonitor[ServerConfig]) *MyService {
     return &MyService{serverConfig: serverConfig}
 }
 
@@ -1205,10 +1205,10 @@ type LoggingConfig struct {
 // 注册所有配置
 func RegisterConfigs(services di.IServiceCollection) {
     // 使用 Configure 自动注册
-    configuration.Configure[ServerConfig](services, "server")
+    config.Configure[ServerConfig](services, "server")
     
     // 带默认值
-    configuration.ConfigureWithDefaults[DatabaseConfig](services, "database", func() *DatabaseConfig {
+    config.ConfigureWithDefaults[DatabaseConfig](services, "database", func() *DatabaseConfig {
         return &DatabaseConfig{
             Connection:     "localhost:5432",
             MaxConnections: 10,
@@ -1216,7 +1216,7 @@ func RegisterConfigs(services di.IServiceCollection) {
     })
     
     // 带验证
-    configuration.ConfigureWithValidation[LoggingConfig](services, "logging",
+    config.ConfigureWithValidation[LoggingConfig](services, "logging",
         func(cfg *LoggingConfig) error {
             validLevels := []string{"Debug", "Information", "Warning", "Error"}
             for _, level := range validLevels {
@@ -1257,9 +1257,9 @@ type Config struct {
     Logging  LoggingConfig  `json:"logging"`
 }
 
-func Load(configuration configuration.IConfiguration) (*Config, error) {
+func Load(configuration config.IConfiguration) (*Config, error) {
     var cfg Config
-    if err := configuration.Bind("", &cfg); err != nil {
+    if err := config.Bind("", &cfg); err != nil {
         return nil, err
     }
     

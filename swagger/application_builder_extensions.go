@@ -1,7 +1,6 @@
 package swagger
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/gocrud/csgo/di"
 	"github.com/gocrud/csgo/openapi"
 	"github.com/gocrud/csgo/web"
@@ -23,7 +22,7 @@ func UseSwagger(app *web.WebApplication) {
 	}
 
 	// Register Swagger JSON endpoint
-	app.MapGet("/swagger/v1/swagger.json", func(c *gin.Context) {
+	app.GET("/swagger/v1/swagger.json", func(ctx *web.HttpContext) web.IActionResult {
 		routes := app.GetRoutes()
 		routeInfos := make([]openapi.RouteInfo, len(routes))
 		for i, r := range routes {
@@ -31,7 +30,7 @@ func UseSwagger(app *web.WebApplication) {
 		}
 
 		spec := generator.Generate(routeInfos)
-		c.JSON(200, spec)
+		return web.JSON(200, spec)
 	})
 }
 
@@ -44,15 +43,14 @@ func UseSwaggerUI(app *web.WebApplication, configure ...func(*SwaggerUIOptions))
 	}
 
 	// Register Swagger UI endpoints
-	handler := func(c *gin.Context) {
-		c.Header("Content-Type", "text/html; charset=utf-8")
-		c.String(200, getSwaggerUIHTML(opts))
+	handler := func(ctx *web.HttpContext) web.IActionResult {
+		return web.ContentWithType(200, getSwaggerUIHTML(opts), "text/html; charset=utf-8")
 	}
 
-	app.MapGet(opts.RoutePrefix+"/index.html", handler)
-	app.MapGet(opts.RoutePrefix+"/", handler)
-	app.MapGet(opts.RoutePrefix, func(c *gin.Context) {
-		c.Redirect(301, opts.RoutePrefix+"/index.html")
+	app.GET(opts.RoutePrefix+"/index.html", handler)
+	app.GET(opts.RoutePrefix+"/", handler)
+	app.GET(opts.RoutePrefix, func(ctx *web.HttpContext) web.IActionResult {
+		return web.RedirectPermanent(opts.RoutePrefix + "/index.html")
 	})
 }
 

@@ -6,8 +6,8 @@ import (
 	"github.com/gin-contrib/cors"
 )
 
-// CorsOptions represents CORS configuration options.
-// Corresponds to .NET CorsOptions.
+// CorsOptions 表示 CORS 配置选项。
+// 对应 .NET 的 CorsOptions。
 type CorsOptions struct {
 	AllowOrigins     []string
 	AllowMethods     []string
@@ -17,7 +17,7 @@ type CorsOptions struct {
 	MaxAge           time.Duration
 }
 
-// NewCorsOptions creates default CORS options.
+// NewCorsOptions 创建默认的 CORS 选项。
 func NewCorsOptions() *CorsOptions {
 	return &CorsOptions{
 		AllowOrigins: []string{"*"},
@@ -27,8 +27,8 @@ func NewCorsOptions() *CorsOptions {
 	}
 }
 
-// UseCors adds CORS middleware to the application.
-// Corresponds to .NET app.UseCors().
+// UseCors 向应用程序添加 CORS 中间件。
+// 对应 .NET 的 app.UseCors()。
 func (app *WebApplication) UseCors(configure ...func(*CorsOptions)) *WebApplication {
 	opts := NewCorsOptions()
 	if len(configure) > 0 && configure[0] != nil {
@@ -48,10 +48,10 @@ func (app *WebApplication) UseCors(configure ...func(*CorsOptions)) *WebApplicat
 	return app
 }
 
-// AddCors adds CORS services to the service collection.
-// Corresponds to .NET services.AddCors().
+// AddCors 向服务集合添加 CORS 服务。
+// 对应 .NET 的 services.AddCors()。
 func (b *WebApplicationBuilder) AddCors(configure ...func(*CorsOptions)) *WebApplicationBuilder {
-	// Store CORS options in DI
+	// 将 CORS 选项存储在 DI 中
 	b.Services.Add(func() *CorsOptions {
 		opts := NewCorsOptions()
 		if len(configure) > 0 && configure[0] != nil {
@@ -61,4 +61,3 @@ func (b *WebApplicationBuilder) AddCors(configure ...func(*CorsOptions)) *WebApp
 	})
 	return b
 }
-

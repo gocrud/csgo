@@ -19,17 +19,17 @@ func TestNestedGroupRoutesCollection(t *testing.T) {
 	apiGroup.WithOpenApi(nil)
 
 	// Create nested group (should inherit OpenAPI metadata)
-	api2Group := apiGroup.MapGroup("/v2")
+	api2Group := apiGroup.Group("/v2")
 
 	// Add route to root group
-	apiGroup.MapGet("/users", func(c *gin.Context) {})
+	apiGroup.GET("/users", func(c *gin.Context) {})
 
 	// Add route to nested group
-	api2Group.MapGet("/posts", func(c *gin.Context) {})
+	api2Group.GET("/posts", func(c *gin.Context) {})
 
 	// Create deeply nested group
-	api3Group := api2Group.MapGroup("/admin")
-	api3Group.MapGet("/settings", func(c *gin.Context) {})
+	api3Group := api2Group.Group("/admin")
+	api3Group.GET("/settings", func(c *gin.Context) {})
 
 	// Get all routes
 	routes := apiGroup.GetRoutes()
@@ -66,10 +66,10 @@ func TestNestedGroupOpenAPIInheritance(t *testing.T) {
 	})
 
 	// Create nested group (should inherit OpenAPI metadata)
-	api2Group := apiGroup.MapGroup("/v2")
+	api2Group := apiGroup.Group("/v2")
 
 	// Add route to nested group
-	api2Group.MapGet("/test", func(c *gin.Context) {})
+	api2Group.GET("/test", func(c *gin.Context) {})
 
 	// Get routes
 	routes := apiGroup.GetRoutes()
@@ -110,10 +110,10 @@ func TestNestedGroupMiddlewareInheritance(t *testing.T) {
 	apiGroup := NewRouteGroupBuilder(rootGroup, "/api")
 
 	// Create nested group with middleware2
-	api2Group := apiGroup.MapGroup("/v2", middleware2)
+	api2Group := apiGroup.Group("/v2", middleware2)
 
 	// Add route to nested group
-	api2Group.MapGet("/test", func(c *gin.Context) {
+	api2Group.GET("/test", func(c *gin.Context) {
 		executionOrder = append(executionOrder, "handler")
 	})
 
@@ -144,20 +144,20 @@ func TestMultiLevelNestedGroups(t *testing.T) {
 	apiGroup.WithOpenApi(nil)
 
 	// Level 1: /api/v1
-	v1Group := apiGroup.MapGroup("/v1")
-	v1Group.MapGet("/users", func(c *gin.Context) {})
+	v1Group := apiGroup.Group("/v1")
+	v1Group.GET("/users", func(c *gin.Context) {})
 
 	// Level 2: /api/v1/admin
-	adminGroup := v1Group.MapGroup("/admin")
-	adminGroup.MapGet("/settings", func(c *gin.Context) {})
+	adminGroup := v1Group.Group("/admin")
+	adminGroup.GET("/settings", func(c *gin.Context) {})
 
 	// Level 3: /api/v1/admin/security
-	securityGroup := adminGroup.MapGroup("/security")
-	securityGroup.MapGet("/permissions", func(c *gin.Context) {})
+	securityGroup := adminGroup.Group("/security")
+	securityGroup.GET("/permissions", func(c *gin.Context) {})
 
 	// Level 1: /api/v2 (sibling of v1)
-	v2Group := apiGroup.MapGroup("/v2")
-	v2Group.MapGet("/posts", func(c *gin.Context) {})
+	v2Group := apiGroup.Group("/v2")
+	v2Group.GET("/posts", func(c *gin.Context) {})
 
 	// Get all routes
 	routes := apiGroup.GetRoutes()
@@ -190,7 +190,7 @@ func TestChildGroupMetadataInheritance(t *testing.T) {
 	})
 
 	// Create child group
-	childGroup := apiGroup.MapGroup("/child")
+	childGroup := apiGroup.Group("/child")
 
 	// Child should inherit parent's metadata
 	if len(childGroup.metadata) == 0 {

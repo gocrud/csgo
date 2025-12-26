@@ -1,17 +1,17 @@
 package router
 
-// EndpointOption is a function that configures an endpoint.
+// EndpointOption 是配置端点的函数。
 type EndpointOption func(IEndpointConventionBuilder) IEndpointConventionBuilder
 
-// IEndpointConventionBuilder is used to configure endpoints.
-// All configuration should be done through WithOpenApi() with endpoint options.
+// IEndpointConventionBuilder 用于配置端点。
+// 所有配置应通过 WithOpenApi() 和端点选项完成。
 type IEndpointConventionBuilder interface {
-	// WithOpenApi enables OpenAPI documentation for this endpoint and applies options.
-	// Corresponds to .NET endpoint.WithOpenApi().
+	// WithOpenApi 为此端点启用 OpenAPI 文档并应用选项。
+	// 对应 .NET 的 endpoint.WithOpenApi()。
 	WithOpenApi(configure func(*OpenApiBuilder)) IEndpointConventionBuilder
 }
 
-// RouteBuilder implements IEndpointConventionBuilder.
+// RouteBuilder 实现 IEndpointConventionBuilder 接口。
 type RouteBuilder struct {
 	method                  string
 	path                    string
@@ -24,10 +24,10 @@ type RouteBuilder struct {
 	authPolicies            []string
 	allowAnonymous          bool
 	openApiEnabled          bool
-	apiSecurityRequirements []map[string][]string // OpenAPI security requirements
+	apiSecurityRequirements []map[string][]string // OpenAPI 安全要求
 }
 
-// NewRouteBuilder creates a new RouteBuilder.
+// NewRouteBuilder 创建新的 RouteBuilder。
 func NewRouteBuilder(method, path string) *RouteBuilder {
 	return &RouteBuilder{
 		method:                  method,
@@ -39,8 +39,8 @@ func NewRouteBuilder(method, path string) *RouteBuilder {
 	}
 }
 
-// WithOpenApi enables OpenAPI documentation for this endpoint and applies options.
-// Corresponds to .NET endpoint.WithOpenApi().
+// WithOpenApi 为此端点启用 OpenAPI 文档并应用选项。
+// 对应 .NET 的 endpoint.WithOpenApi()。
 func (b *RouteBuilder) WithOpenApi(configure func(*OpenApiBuilder)) IEndpointConventionBuilder {
 	b.openApiEnabled = true
 

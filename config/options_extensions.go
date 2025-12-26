@@ -1,4 +1,4 @@
-package configuration
+package config
 
 import (
 	"fmt"
@@ -8,15 +8,15 @@ import (
 
 // Configure registers configuration instance T with the DI container.
 // It binds the configuration to the specified section and registers IOptionsMonitor[T] and T itself.
-// Corresponds to .NET services.Configure<T>(configuration.GetSection(...)).
+// Corresponds to .NET services.Configure<T>(config.GetSection(...)).
 //
 // This function registers both the Options pattern (IOptionsMonitor[T]) and direct injection (T),
 // allowing services to choose their preferred injection style.
 //
 // Usage:
 //
-//	configuration.Configure[AppSettings](services, "App")
-//	configuration.Configure[Config](services, "") // bind root configuration
+//	config.Configure[AppSettings](services, "App")
+//	config.Configure[Config](services, "") // bind root configuration
 //
 // Injection styles:
 //
@@ -61,7 +61,7 @@ func Configure[T any](services di.IServiceCollection, section string) {
 //
 // Usage:
 //
-//	configuration.ConfigureWithDefaults[AppSettings](services, "App", func() *AppSettings {
+//	config.ConfigureWithDefaults[AppSettings](services, "App", func() *AppSettings {
 //	    return &AppSettings{
 //	        Timeout: 30,
 //	        MaxRetries: 3,
@@ -99,7 +99,7 @@ func ConfigureWithDefaults[T any](services di.IServiceCollection, section string
 //
 // Usage:
 //
-//	configuration.ConfigureWithValidation[EmailSettings](services, "Email", func(opts *EmailSettings) error {
+//	config.ConfigureWithValidation[EmailSettings](services, "Email", func(opts *EmailSettings) error {
 //	    if opts.SmtpHost == "" {
 //	        return fmt.Errorf("SMTP host is required")
 //	    }

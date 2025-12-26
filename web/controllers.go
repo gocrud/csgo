@@ -7,63 +7,62 @@ import (
 	"github.com/gocrud/csgo/di"
 )
 
-// ⚠️ IMPORTANT: Controller Lifecycle
+// ⚠️ 重要：控制器生命周期
 //
-// Controllers are SINGLETONS and created once at application startup.
-// They are shared across all HTTP requests for the lifetime of the application.
+// 控制器是单例（SINGLETON），在应用程序启动时创建一次。
+// 它们在应用程序的整个生命周期内被所有 HTTP 请求共享。
 //
-// Best Practices:
-// 1. Controllers MUST be stateless - do NOT store request-specific data in controller fields
-// 2. Access request data through HttpContext parameter in handlers
-// 3. Inject services (IServiceProvider or specific services) via constructor
-// 4. For request-scoped services, resolve them using di.GetRequiredService() in handlers
+// 最佳实践：
+// 1. 控制器必须是无状态的 - 不要在控制器字段中存储特定于请求的数据
+// 2. 通过处理器中的 HttpContext 参数访问请求数据
+// 3. 通过构造函数注入服务（IServiceProvider 或特定服务）
+// 4. 对于请求范围的服务，在处理器中使用 di.GetRequiredService() 解析
 //
-// Example:
+// 示例：
 //
 //	type UserController struct {
 //	    web.ControllerBase
-//	    userService IUserService  // ✅ Service dependency (safe)
+//	    userService IUserService  // ✅ 服务依赖（安全）
 //	}
 //
 //	func (c *UserController) MapRoutes(app *web.WebApplication) {
-//	    app.MapGet("/users/:id", func(ctx *web.HttpContext) web.IActionResult {
+//	    app.GET("/users/:id", func(ctx *web.HttpContext) web.IActionResult {
 //	        id, _ := ctx.PathInt("id")
-//	        user := c.userService.GetUser(id)  // ✅ Safe: service handles business logic
+//	        user := c.userService.GetUser(id)  // ✅ 安全：服务处理业务逻辑
 //	        return ctx.Ok(user)
 //	    })
 //	}
 
-// IController defines the interface for controllers.
-// Controllers that implement this interface can be automatically discovered
-// and registered by MapControllers().
+// IController 定义控制器接口。
+// 实现此接口的控制器可以被 MapControllers() 自动发现和注册。
 type IController interface {
-	// MapRoutes registers the controller's routes with the application.
+	// MapRoutes 向应用程序注册控制器的路由。
 	MapRoutes(app *WebApplication)
 }
 
-// ControllerBase provides common functionality for controllers.
-// Embed this in your controllers to get access to common services.
+// ControllerBase 为控制器提供通用功能。
+// 在您的控制器中嵌入此结构以访问通用服务。
 type ControllerBase struct {
 	Services di.IServiceProvider
 }
 
-// NewControllerBase creates a new ControllerBase with the given service provider.
+// NewControllerBase 创建一个新的 ControllerBase，使用给定的服务提供者。
 func NewControllerBase(services di.IServiceProvider) ControllerBase {
 	return ControllerBase{Services: services}
 }
 
-// ControllerOptions represents controller configuration options.
+// ControllerOptions 表示控制器配置选项。
 type ControllerOptions struct {
-	// EnableEndpointMetadata enables endpoint metadata for OpenAPI generation
+	// EnableEndpointMetadata 启用 OpenAPI 生成的端点元数据
 	EnableEndpointMetadata bool
 }
 
-// controllerRegistry stores registered controller factories
+// controllerRegistry 存储已注册的控制器工厂
 var controllerFactories []func(di.IServiceProvider) IController
 
-// AddControllers adds MVC controller services and enables controller discovery.
-// TODO: This method is not used yet.
-// Corresponds to .NET services.AddControllers().
+// AddControllers 添加 MVC 控制器服务并启用控制器发现。
+// TODO: 此方法尚未使用。
+// 对应 .NET 的 services.AddControllers()。
 func (b *WebApplicationBuilder) AddControllers(configure ...func(*ControllerOptions)) *WebApplicationBuilder {
 	opts := &ControllerOptions{
 		EnableEndpointMetadata: true,
@@ -72,33 +71,33 @@ func (b *WebApplicationBuilder) AddControllers(configure ...func(*ControllerOpti
 		configure[0](opts)
 	}
 
-	// Store options for later use
+	// 存储选项供稍后使用
 	b.Services.Add(func() *ControllerOptions { return opts })
 
 	return b
 }
 
-// AddController registers a controller factory for automatic discovery.
-// The controller will be created as a SINGLETON when MapControllers() is called.
+// AddController 注册控制器工厂以供自动发现。
+// 控制器将在调用 MapControllers() 时作为单例创建。
 //
-// Important: Controllers are singletons and must be stateless. Do not store
-// request-specific data in controller fields.
+// 重要：控制器是单例，必须是无状态的。不要在控制器字段中存储
+// 特定于请求的数据。
 //
-// Usage:
+// 用法：
 //
-//	// With constructor function
+//	// 使用构造函数
 //	web.AddController(builder.Services, NewUserController)
 func AddController(services di.IServiceCollection, constructor any) {
 	// 1. 基础校验：确保传入的是个函数
 	ctorType := reflect.TypeOf(constructor)
 	if ctorType.Kind() != reflect.Func {
-		panic("AddController: constructor must be a function")
+		panic("AddController: 构造函数必须是一个函数")
 	}
 
 	// 2. 校验返回值：确保返回了 IController
 	// 支持 func(...) *UserController 或 func(...) (*UserController, error)
 	if ctorType.NumOut() == 0 {
-		panic("AddController: constructor must return a controller instance")
+		panic("AddController: 构造函数必须返回一个控制器实例")
 	}
 
 	// 获取第一个返回值的类型（通常是 *UserController）
@@ -107,7 +106,7 @@ func AddController(services di.IServiceCollection, constructor any) {
 	// 验证它是否实现了 IController 接口
 	iControllerType := reflect.TypeOf((*IController)(nil)).Elem()
 	if !returnType.Implements(iControllerType) {
-		panic(fmt.Sprintf("AddController: Type %v must implement web.IController interface", returnType))
+		panic(fmt.Sprintf("AddController: 类型 %v 必须实现 web.IController 接口", returnType))
 	}
 
 	// 3. 将 Controller 注册到 DI 容器
@@ -129,10 +128,10 @@ func AddController(services di.IServiceCollection, constructor any) {
 	})
 }
 
-// AddControllerInstance registers an existing controller instance.
-// Use this when you need more control over controller creation.
+// AddControllerInstance 注册现有的控制器实例。
+// 当您需要更多地控制控制器创建时使用此方法。
 //
-// Usage:
+// 用法：
 //
 //	web.AddControllerInstance(builder.Services, func(sp di.IServiceProvider) web.IController {
 //	    return NewUserController(sp)
@@ -141,21 +140,21 @@ func AddControllerInstance(services di.IServiceCollection, factory func(di.IServ
 	controllerFactories = append(controllerFactories, factory)
 }
 
-// MapControllers discovers and registers all controllers as singletons.
-// Each controller is created once at startup and used for the lifetime of the application.
-// Controllers must be registered using AddController() before calling this method.
+// MapControllers 发现并注册所有控制器为单例。
+// 每个控制器在启动时创建一次，并在应用程序的整个生命周期内使用。
+// 在调用此方法之前，必须使用 AddController() 注册控制器。
 //
-// This method should be called after Build() and before Run().
-// Corresponds to .NET app.MapControllers().
+// 此方法应在 Build() 之后和 Run() 之前调用。
+// 对应 .NET 的 app.MapControllers()。
 //
-// Usage:
+// 用法：
 //
 //	app := builder.Build()
-//	app.MapControllers()  // Controllers created here as singletons
+//	app.MapControllers()  // 控制器在此处作为单例创建
 //	app.Run()
 func (app *WebApplication) MapControllers() *WebApplication {
-	// Create each controller once and register its routes
-	// These controller instances will be reused for all requests
+	// 创建每个控制器一次并注册其路由
+	// 这些控制器实例将被所有请求重用
 	for _, factory := range controllerFactories {
 		controller := factory(app.Services)
 		controller.MapRoutes(app)
@@ -164,14 +163,14 @@ func (app *WebApplication) MapControllers() *WebApplication {
 	return app
 }
 
-// ResetControllers clears all registered controller factories.
-// This is mainly useful for testing.
+// ResetControllers 清除所有已注册的控制器工厂。
+// 这主要用于测试。
 func ResetControllers() {
 	controllerFactories = nil
 }
 
-// GetRegisteredControllerCount returns the number of registered controllers.
-// This is mainly useful for testing and debugging.
+// GetRegisteredControllerCount 返回已注册控制器的数量。
+// 这主要用于测试和调试。
 func GetRegisteredControllerCount() int {
 	return len(controllerFactories)
 }

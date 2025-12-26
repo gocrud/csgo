@@ -11,21 +11,21 @@ import (
 	"github.com/gocrud/csgo/validation"
 )
 
-// IActionResult represents the result of an action method.
-// Similar to .NET's IActionResult interface.
+// IActionResult 表示操作方法的结果。
+// 类似于 .NET 的 IActionResult 接口。
 type IActionResult interface {
-	// ExecuteResult writes the result to the response.
+	// ExecuteResult 将结果写入响应。
 	ExecuteResult(c *gin.Context)
 }
 
-// ApiResponse is the standard API response format.
+// ApiResponse 是标准的 API 响应格式。
 type ApiResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
 	Error   *ApiError   `json:"error,omitempty"`
 }
 
-// ApiError represents an error in the API response.
+// ApiError 表示 API 响应中的错误。
 type ApiError struct {
 	Code    string                       `json:"code"`              // 错误码
 	Message string                       `json:"message"`           // 错误消息
@@ -33,84 +33,84 @@ type ApiError struct {
 	Details M                            `json:"details,omitempty"` // 额外详情（可选）
 }
 
-// ==================== Success Results ====================
+// ==================== 成功结果 ====================
 
-// OkResult represents a 200 OK response.
+// OkResult 表示 200 OK 响应。
 type OkResult struct {
 	Data interface{}
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r OkResult) ExecuteResult(c *gin.Context) {
 	c.JSON(200, ApiResponse{Success: true, Data: r.Data})
 }
 
-// Ok creates a 200 OK result with data.
+// Ok 创建 200 OK 结果及数据。
 func Ok(data interface{}) IActionResult {
 	return OkResult{Data: data}
 }
 
-// CreatedResult represents a 201 Created response.
+// CreatedResult 表示 201 Created 响应。
 type CreatedResult struct {
 	Data interface{}
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r CreatedResult) ExecuteResult(c *gin.Context) {
 	c.JSON(201, ApiResponse{Success: true, Data: r.Data})
 }
 
-// Created creates a 201 Created result with data.
+// Created 创建 201 Created 结果及数据。
 func Created(data interface{}) IActionResult {
 	return CreatedResult{Data: data}
 }
 
-// NoContentResult represents a 204 No Content response.
+// NoContentResult 表示 204 No Content 响应。
 type NoContentResult struct{}
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r NoContentResult) ExecuteResult(c *gin.Context) {
 	c.Status(204)
 }
 
-// NoContent creates a 204 No Content result.
+// NoContent 创建 204 No Content 结果。
 func NoContent() IActionResult {
 	return NoContentResult{}
 }
 
-// ==================== Redirect Results ====================
+// ==================== 重定向结果 ====================
 
-// RedirectResult represents a redirect response.
+// RedirectResult 表示重定向响应。
 type RedirectResult struct {
 	StatusCode int
 	Location   string
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r RedirectResult) ExecuteResult(c *gin.Context) {
 	c.Redirect(r.StatusCode, r.Location)
 }
 
-// Redirect creates a 302 Found redirect result.
+// Redirect 创建 302 Found 重定向结果。
 func Redirect(location string) IActionResult {
 	return RedirectResult{StatusCode: 302, Location: location}
 }
 
-// RedirectPermanent creates a 301 Moved Permanently redirect result.
+// RedirectPermanent 创建 301 Moved Permanently 重定向结果。
 func RedirectPermanent(location string) IActionResult {
 	return RedirectResult{StatusCode: 301, Location: location}
 }
 
-// ==================== Error Results ====================
+// ==================== 错误结果 ====================
 
-// ErrorResult represents an error response.
+// ErrorResult 表示错误响应。
 type ErrorResult struct {
 	StatusCode int
 	Code       string
 	Message    string
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r ErrorResult) ExecuteResult(c *gin.Context) {
 	c.JSON(r.StatusCode, ApiResponse{
 		Success: false,
@@ -118,55 +118,55 @@ func (r ErrorResult) ExecuteResult(c *gin.Context) {
 	})
 }
 
-// Error creates a custom error result.
+// Error 创建自定义错误结果。
 func Error(statusCode int, code, message string) IActionResult {
 	return ErrorResult{StatusCode: statusCode, Code: code, Message: message}
 }
 
-// BadRequest creates a 400 Bad Request result.
+// BadRequest 创建 400 Bad Request 结果。
 func BadRequest(message string) IActionResult {
 	return ErrorResult{StatusCode: 400, Code: "BAD_REQUEST", Message: message}
 }
 
-// BadRequestWithCode creates a 400 Bad Request result with custom code.
+// BadRequestWithCode 创建 400 Bad Request 结果，带有自定义错误码。
 func BadRequestWithCode(code, message string) IActionResult {
 	return ErrorResult{StatusCode: 400, Code: code, Message: message}
 }
 
-// Unauthorized creates a 401 Unauthorized result.
+// Unauthorized 创建 401 Unauthorized 结果。
 func Unauthorized(message string) IActionResult {
 	return ErrorResult{StatusCode: 401, Code: "UNAUTHORIZED", Message: message}
 }
 
-// Forbidden creates a 403 Forbidden result.
+// Forbidden 创建 403 Forbidden 结果。
 func Forbidden(message string) IActionResult {
 	return ErrorResult{StatusCode: 403, Code: "FORBIDDEN", Message: message}
 }
 
-// NotFound creates a 404 Not Found result.
+// NotFound 创建 404 Not Found 结果。
 func NotFound(message string) IActionResult {
 	return ErrorResult{StatusCode: 404, Code: "NOT_FOUND", Message: message}
 }
 
-// Conflict creates a 409 Conflict result.
+// Conflict 创建 409 Conflict 结果。
 func Conflict(message string) IActionResult {
 	return ErrorResult{StatusCode: 409, Code: "CONFLICT", Message: message}
 }
 
-// InternalError creates a 500 Internal Server Error result.
+// InternalError 创建 500 Internal Server Error 结果。
 func InternalError(message string) IActionResult {
 	return ErrorResult{StatusCode: 500, Code: "INTERNAL_ERROR", Message: message}
 }
 
-// ==================== Validation Error Results ====================
+// ==================== 验证错误结果 ====================
 
-// ValidationErrorResult represents a validation error response.
+// ValidationErrorResult 表示验证错误响应。
 type ValidationErrorResult struct {
 	StatusCode int
 	Errors     validation.ValidationErrors
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r ValidationErrorResult) ExecuteResult(c *gin.Context) {
 	c.JSON(r.StatusCode, ApiResponse{
 		Success: false,
@@ -178,12 +178,12 @@ func (r ValidationErrorResult) ExecuteResult(c *gin.Context) {
 	})
 }
 
-// ValidationBadRequest creates a 400 Bad Request result with validation errors.
+// ValidationBadRequest 创建 400 Bad Request 结果，带有验证错误。
 func ValidationBadRequest(errs validation.ValidationErrors) IActionResult {
 	return ValidationErrorResult{StatusCode: 400, Errors: errs}
 }
 
-// ValidationBadRequestWithCode creates a 400 Bad Request result with validation errors and custom code.
+// ValidationBadRequestWithCode 创建 400 Bad Request 结果，带有验证错误和自定义错误码。
 func ValidationBadRequestWithCode(code string, errs validation.ValidationErrors) IActionResult {
 	return &customValidationErrorResult{
 		StatusCode: 400,
@@ -192,14 +192,14 @@ func ValidationBadRequestWithCode(code string, errs validation.ValidationErrors)
 	}
 }
 
-// customValidationErrorResult for custom error codes
+// customValidationErrorResult 用于自定义错误码。
 type customValidationErrorResult struct {
 	StatusCode int
 	Code       string
 	Errors     validation.ValidationErrors
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r customValidationErrorResult) ExecuteResult(c *gin.Context) {
 	c.JSON(r.StatusCode, ApiResponse{
 		Success: false,
@@ -211,23 +211,24 @@ func (r customValidationErrorResult) ExecuteResult(c *gin.Context) {
 	})
 }
 
-// ==================== Business Error Results ====================
+// ==================== 业务错误结果 ====================
 
-// BizErrorResult represents a business error response.
-type BizErrorResult struct {
+// FrameworkErrorResult 表示框架错误响应。
+type FrameworkErrorResult struct {
 	StatusCode int
-	BizError   *errors.BizError
+	Error      *errors.Error
 }
 
-// ExecuteResult implements IActionResult.
-func (r BizErrorResult) ExecuteResult(c *gin.Context) {
+// ExecuteResult 实现 IActionResult 接口。
+func (r FrameworkErrorResult) ExecuteResult(c *gin.Context) {
 	apiError := &ApiError{
-		Code:    r.BizError.Code,
-		Message: r.BizError.Message,
+		Code:    r.Error.Code(),
+		Message: r.Error.Message(),
 	}
 	// 包含 Details 字段（如果有）
-	if len(r.BizError.Details) > 0 {
-		apiError.Details = r.BizError.Details
+	details := r.Error.Details()
+	if len(details) > 0 {
+		apiError.Details = details
 	}
 	c.JSON(r.StatusCode, ApiResponse{
 		Success: false,
@@ -235,25 +236,25 @@ func (r BizErrorResult) ExecuteResult(c *gin.Context) {
 	})
 }
 
-// BizError creates a business error result with auto-mapped HTTP status code.
-// Maps common error patterns to appropriate HTTP status codes:
+// FrameworkError 创建框架错误结果，自动映射 HTTP 状态码。
+// 将常见错误模式映射到适当的 HTTP 状态码：
 // - NOT_FOUND -> 404
 // - ALREADY_EXISTS -> 409
 // - PERMISSION_DENIED -> 403
 // - INVALID_* -> 400
-// - Default -> 400
-func BizError(err *errors.BizError) IActionResult {
-	statusCode := mapBizErrorToStatusCode(err.Code)
-	return BizErrorResult{StatusCode: statusCode, BizError: err}
+// - 默认 -> 400
+func FrameworkError(err *errors.Error) IActionResult {
+	statusCode := mapErrorToStatusCode(err.Code())
+	return FrameworkErrorResult{StatusCode: statusCode, Error: err}
 }
 
-// BizErrorWithStatus creates a business error result with specified HTTP status code.
-func BizErrorWithStatus(statusCode int, err *errors.BizError) IActionResult {
-	return BizErrorResult{StatusCode: statusCode, BizError: err}
+// FrameworkErrorWithStatus 创建框架错误结果，带有指定的 HTTP 状态码。
+func FrameworkErrorWithStatus(statusCode int, err *errors.Error) IActionResult {
+	return FrameworkErrorResult{StatusCode: statusCode, Error: err}
 }
 
-// mapBizErrorToStatusCode maps error code to HTTP status code
-func mapBizErrorToStatusCode(code string) int {
+// mapErrorToStatusCode 将错误码映射到 HTTP 状态码。
+func mapErrorToStatusCode(code string) int {
 	switch {
 	case containsPattern(code, "NOT_FOUND"):
 		return 404
@@ -278,14 +279,14 @@ func mapBizErrorToStatusCode(code string) int {
 	}
 }
 
-// containsPattern checks if code contains pattern
+// containsPattern 检查错误码是否包含特定模式。
 func containsPattern(code, pattern string) bool {
 	return len(code) >= len(pattern) &&
 		(code[len(code)-len(pattern):] == pattern ||
 			containsSubstring(code, "."+pattern))
 }
 
-// containsSubstring simple substring check
+// containsSubstring 简单的子字符串检查。
 func containsSubstring(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
@@ -295,34 +296,34 @@ func containsSubstring(s, substr string) bool {
 	return false
 }
 
-// ==================== JSON Result ====================
+// ==================== JSON 结果 ====================
 
-// JsonResult represents a custom JSON response.
+// JsonResult 表示自定义 JSON 响应。
 type JsonResult struct {
 	StatusCode int
 	Data       interface{}
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r JsonResult) ExecuteResult(c *gin.Context) {
 	c.JSON(r.StatusCode, r.Data)
 }
 
-// Json creates a custom JSON result.
-func Json(statusCode int, data interface{}) IActionResult {
+// JSON 创建自定义 JSON 结果。
+func JSON(statusCode int, data interface{}) IActionResult {
 	return JsonResult{StatusCode: statusCode, Data: data}
 }
 
-// ==================== Content Result ====================
+// ==================== 内容结果 ====================
 
-// ContentResult represents a plain text response.
+// ContentResult 表示纯文本响应。
 type ContentResult struct {
 	StatusCode  int
 	Content     string
 	ContentType string
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r ContentResult) ExecuteResult(c *gin.Context) {
 	if r.ContentType != "" {
 		c.Data(r.StatusCode, r.ContentType, []byte(r.Content))
@@ -331,25 +332,25 @@ func (r ContentResult) ExecuteResult(c *gin.Context) {
 	}
 }
 
-// Content creates a plain text result.
+// Content 创建纯文本结果。
 func Content(statusCode int, content string) IActionResult {
 	return ContentResult{StatusCode: statusCode, Content: content}
 }
 
-// ContentWithType creates a content result with custom content type.
+// ContentWithType 创建内容结果，带有自定义内容类型。
 func ContentWithType(statusCode int, content, contentType string) IActionResult {
 	return ContentResult{StatusCode: statusCode, Content: content, ContentType: contentType}
 }
 
-// ==================== File Result ====================
+// ==================== 文件结果 ====================
 
-// FileResult represents a file download response.
+// FileResult 表示文件下载响应。
 type FileResult struct {
 	FilePath string
 	FileName string
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r FileResult) ExecuteResult(c *gin.Context) {
 	if r.FileName != "" {
 		c.FileAttachment(r.FilePath, r.FileName)
@@ -358,43 +359,43 @@ func (r FileResult) ExecuteResult(c *gin.Context) {
 	}
 }
 
-// File creates a file result.
+// File 创建文件结果。
 func File(filePath string) IActionResult {
 	return FileResult{FilePath: filePath}
 }
 
-// FileDownload creates a file download result with custom filename.
+// FileDownload 创建文件下载结果，带有自定义文件名。
 func FileDownload(filePath, fileName string) IActionResult {
 	return FileResult{FilePath: filePath, FileName: fileName}
 }
 
-// ==================== Status Result ====================
+// ==================== 状态结果 ====================
 
-// StatusResult represents a response with only status code.
+// StatusResult 表示仅包含状态码的响应。
 type StatusResult struct {
 	StatusCode int
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r StatusResult) ExecuteResult(c *gin.Context) {
 	c.Status(r.StatusCode)
 }
 
-// Status creates a status-only result.
+// Status 创建仅包含状态码的结果。
 func Status(statusCode int) IActionResult {
 	return StatusResult{StatusCode: statusCode}
 }
 
-// ==================== Smart Error Handling ====================
+// ==================== 智能错误处理 ====================
 
-// ErrorHandler 错误处理器函数类型
-// 接收错误和默认消息，返回 IActionResult
-// 如果返回 nil，表示该处理器不处理此错误，继续尝试其他处理器
+// ErrorHandler 错误处理器函数类型。
+// 接收错误和默认消息，返回 IActionResult。
+// 如果返回 nil，表示该处理器不处理此错误，继续尝试其他处理器。
 type ErrorHandler func(err error, defaultMessage ...string) IActionResult
 
 var (
 	errorHandlersMu     sync.Mutex
-	errorHandlersAtomic atomic.Value // stores map[reflect.Type]ErrorHandler
+	errorHandlersAtomic atomic.Value // 存储 map[reflect.Type]ErrorHandler
 )
 
 func init() {
@@ -402,8 +403,8 @@ func init() {
 	errorHandlersAtomic.Store(make(map[reflect.Type]ErrorHandler))
 }
 
-// RegisterErrorHandler 注册错误类型处理器（泛型版本）
-// T: 错误类型，handler: 处理函数
+// RegisterErrorHandler 注册错误类型处理器（泛型版本）。
+// T: 错误类型，handler: 处理函数。
 //
 // 使用示例：
 //
@@ -444,18 +445,18 @@ func RegisterErrorHandler[T error](handler func(T, ...string) IActionResult) {
 	errorHandlersAtomic.Store(newMap)
 }
 
-// ClearErrorHandlers 清除所有自定义错误处理器
-// 主要用于测试场景
+// ClearErrorHandlers 清除所有自定义错误处理器。
+// 主要用于测试场景。
 func ClearErrorHandlers() {
 	errorHandlersMu.Lock()
 	defer errorHandlersMu.Unlock()
 	errorHandlersAtomic.Store(make(map[reflect.Type]ErrorHandler))
 }
 
-// FromError 智能处理各种类型的错误并返回对应的 ActionResult
+// FromError 智能处理各种类型的错误并返回对应的 ActionResult。
 // 错误处理优先级：
 // 1. 自定义错误处理器（如果已注册）
-// 2. *errors.BizError：自动映射 HTTP 状态码
+// 2. *errors.Error：自动映射 HTTP 状态码
 // 3. validation.ValidationErrors：返回验证错误响应
 // 4. 普通 error：返回内部错误，使用自定义消息
 //
@@ -479,9 +480,9 @@ func FromError(err error, defaultMessage ...string) IActionResult {
 		}
 	}
 
-	// 2. 检查是否为 BizError
-	if bizErr, ok := err.(*errors.BizError); ok {
-		return BizError(bizErr)
+	// 2. 检查是否为框架 Error
+	if fwErr, ok := err.(*errors.Error); ok {
+		return FrameworkError(fwErr)
 	}
 
 	// 3. 检查是否为 ValidationErrors
@@ -497,10 +498,10 @@ func FromError(err error, defaultMessage ...string) IActionResult {
 	return InternalError(msg)
 }
 
-// FromErrorWithStatus 类似 FromError，但允许为普通 error 指定自定义 HTTP 状态码
+// FromErrorWithStatus 类似 FromError，但允许为普通 error 指定自定义 HTTP 状态码。
 // 错误处理优先级：
 // 1. 自定义错误处理器（如果已注册）
-// 2. *errors.BizError：忽略 statusCode，使用自动映射
+// 2. *errors.Error：忽略 statusCode，使用自动映射
 // 3. validation.ValidationErrors：忽略 statusCode，固定返回 400
 // 4. 普通 error：使用指定的 statusCode
 //
@@ -524,9 +525,9 @@ func FromErrorWithStatus(err error, statusCode int, defaultMessage ...string) IA
 		}
 	}
 
-	// 2. 检查是否为 BizError（忽略 statusCode）
-	if bizErr, ok := err.(*errors.BizError); ok {
-		return BizError(bizErr)
+	// 2. 检查是否为框架 Error（忽略 statusCode）
+	if fwErr, ok := err.(*errors.Error); ok {
+		return FrameworkError(fwErr)
 	}
 
 	// 3. 检查是否为 ValidationErrors（忽略 statusCode）
@@ -562,16 +563,16 @@ func FromErrorWithStatus(err error, statusCode int, defaultMessage ...string) IA
 	return Error(statusCode, code, msg)
 }
 
-// ==================== Image Results ====================
+// ==================== 图片结果 ====================
 
-// Base64ImageResult represents an image response as base64 in JSON.
+// Base64ImageResult 表示以 base64 格式在 JSON 中返回的图片响应。
 type Base64ImageResult struct {
 	StatusCode  int
-	ImageData   string // Base64 encoded image
-	ContentType string // Original image content type (e.g., image/png)
+	ImageData   string // Base64 编码的图片
+	ContentType string // 原始图片内容类型（如 image/png）
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r Base64ImageResult) ExecuteResult(c *gin.Context) {
 	c.JSON(r.StatusCode, ApiResponse{
 		Success: true,
@@ -582,8 +583,8 @@ func (r Base64ImageResult) ExecuteResult(c *gin.Context) {
 	})
 }
 
-// Base64Image creates a base64 image result.
-// The image data is encoded as base64 and returned in JSON format.
+// Base64Image 创建 base64 图片结果。
+// 图片数据将被编码为 base64 并以 JSON 格式返回。
 func Base64Image(imageData []byte, contentType string) IActionResult {
 	encoded := base64.StdEncoding.EncodeToString(imageData)
 	return Base64ImageResult{
@@ -593,20 +594,20 @@ func Base64Image(imageData []byte, contentType string) IActionResult {
 	}
 }
 
-// BinaryImageResult represents a binary image response.
+// BinaryImageResult 表示二进制图片响应。
 type BinaryImageResult struct {
 	StatusCode  int
 	ImageData   []byte
-	ContentType string // e.g., image/png, image/jpeg
+	ContentType string // 如 image/png、image/jpeg
 }
 
-// ExecuteResult implements IActionResult.
+// ExecuteResult 实现 IActionResult 接口。
 func (r BinaryImageResult) ExecuteResult(c *gin.Context) {
 	c.Data(r.StatusCode, r.ContentType, r.ImageData)
 }
 
-// BinaryImage creates a binary image result.
-// The image data is returned as raw binary with the specified content type.
+// BinaryImage 创建二进制图片结果。
+// 图片数据将以指定的内容类型作为原始二进制返回。
 func BinaryImage(imageData []byte, contentType string) IActionResult {
 	return BinaryImageResult{
 		StatusCode:  200,
@@ -615,20 +616,20 @@ func BinaryImage(imageData []byte, contentType string) IActionResult {
 	}
 }
 
-// PNG creates a PNG image result.
-// Convenience method for BinaryImage with image/png content type.
+// PNG 创建 PNG 图片结果。
+// BinaryImage 的便捷方法，内容类型为 image/png。
 func PNG(imageData []byte) IActionResult {
 	return BinaryImage(imageData, "image/png")
 }
 
-// JPEG creates a JPEG image result.
-// Convenience method for BinaryImage with image/jpeg content type.
+// JPEG 创建 JPEG 图片结果。
+// BinaryImage 的便捷方法，内容类型为 image/jpeg。
 func JPEG(imageData []byte) IActionResult {
 	return BinaryImage(imageData, "image/jpeg")
 }
 
-// WebP creates a WebP image result.
-// Convenience method for BinaryImage with image/webp content type.
+// WebP 创建 WebP 图片结果。
+// BinaryImage 的便捷方法，内容类型为 image/webp。
 func WebP(imageData []byte) IActionResult {
 	return BinaryImage(imageData, "image/webp")
 }

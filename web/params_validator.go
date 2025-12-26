@@ -10,12 +10,45 @@ import (
 )
 
 // ParamValidator 参数验证器，支持链式调用
+//
+// Deprecated: 使用新的泛型参数 API 代替：web.Path[T], web.Query[T], web.Header[T]
+//
+// 迁移示例：
+//
+//	// 旧 API:
+//	params := c.Params()
+//	id := params.PathInt("id").Min(1).Value()
+//	page := params.QueryInt("page").ValueOr(1)
+//	email := params.QueryString("email").Required().Email().Value()
+//	if result := params.Check(); result != nil { return result }
+//
+//	// 新 API:
+//	id := web.Path[int](c, "id").Min(1).Value()
+//	page := web.Query[int](c, "page").Default(1)
+//	email := web.Query[string](c, "email").Required().Email().Value()
+//	// 不需要手动 Check()，验证错误会自动处理
 type ParamValidator struct {
 	ctx    *HttpContext
 	errors validation.ValidationErrors
 }
 
 // Params 创建参数验证器
+//
+// Deprecated: 使用新的泛型参数 API 代替：web.Path[T], web.Query[T], web.Header[T]
+//
+// 迁移示例：
+//
+//	// 旧 API:
+//	id := c.Params().PathInt("id").Min(1).Value()
+//
+//	// 新 API:
+//	id := web.Path[int](c, "id").Min(1).Value()
+//
+// 新 API 的优势：
+//   - 更简洁：无需 Params() 前缀和 Check() 调用
+//   - 类型安全：使用 Go 泛型，编译时检查类型
+//   - 自动错误处理：验证错误自动收集并返回
+//   - 更好的 IDE 支持：完整的类型提示和自动补全
 func (c *HttpContext) Params() *ParamValidator {
 	return &ParamValidator{
 		ctx:    c,

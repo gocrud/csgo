@@ -1,13 +1,13 @@
 package web
 
-// StaticFileOptions represents static file serving options.
+// StaticFileOptions 表示静态文件服务选项。
 type StaticFileOptions struct {
 	RequestPath string
 	FileSystem  string
 }
 
-// UseStaticFiles serves static files.
-// Corresponds to .NET app.UseStaticFiles().
+// UseStaticFiles 提供静态文件服务。
+// 对应 .NET 的 app.UseStaticFiles()。
 func (app *WebApplication) UseStaticFiles(configure ...func(*StaticFileOptions)) *WebApplication {
 	opts := &StaticFileOptions{
 		RequestPath: "/static",
@@ -22,10 +22,9 @@ func (app *WebApplication) UseStaticFiles(configure ...func(*StaticFileOptions))
 	return app
 }
 
-// UseDefaultFiles enables default file mapping.
-// Corresponds to .NET app.UseDefaultFiles().
+// UseDefaultFiles 启用默认文件映射。
+// 对应 .NET 的 app.UseDefaultFiles()。
 func (app *WebApplication) UseDefaultFiles() *WebApplication {
 	app.engine.StaticFile("/", "./wwwroot/index.html")
 	return app
 }
-

@@ -70,7 +70,10 @@ func main() {
     // 在路由中使用服务
     app.MapGet("/users/:id", func(c *web.HttpContext) web.IActionResult {
         userService := di.Get[*UserService](c.Services)
-        id := c.Params().PathInt("id").Value()
+        id, err := web.Path[int](c, "id").Value()
+        if err != nil {
+            return err
+        }
         user := userService.GetUser(id)
         return c.Ok(web.M{"user": user})
     })
@@ -91,7 +94,10 @@ func NewUserController(userService *UserService) *UserController {
 }
 
 func (ctrl *UserController) GetUser(c *web.HttpContext) web.IActionResult {
-    id := c.Params().PathInt("id").Value()
+    id, err := web.Path[int](c, "id").Value()
+    if err != nil {
+        return err
+    }
     user := ctrl.userService.GetUser(id)
     return c.Ok(user)
 }
@@ -246,16 +252,189 @@ app.MapPatch("/users/:id", func(c *web.HttpContext) web.IActionResult {
 })
 ```
 
-### 路径参数
+### 泛型参数 API（推荐）⭐
+
+CSGO 提供了基于 Go 泛型的现代参数验证 API，具有以下优势：
+
+- **类型安全**：编译时类型检查
+- **更简洁**：无需 `Params()` 前缀和 `Check()` 调用
+- **自动错误处理**：验证错误自动收集并返回
+- **更好的 IDE 支持**：完整的类型提示
+
+#### 基本用法
+
+```go
+// 路径参数
+app.MapGet("/users/:id", func(c *web.HttpContext) web.IActionResult {
+    // 直接获取并转换类型
+    id := web.Path[int](c, "id").Value()
+    return c.Ok(web.M{"id": id})
+})
+
+// 查询参数带默认值
+app.MapGet("/products", func(c *web.HttpContext) web.IActionResult {
+    page := web.Query[int](c, "page").Default(1)
+    size := web.Query[int](c, "size").Default(10)
+    sort := web.Query[string](c, "sort").Default("date")
+    
+    return c.Ok(web.M{
+        "page": page,
+        "size": size,
+        "sort": sort,
+    })
+})
+
+// 请求头参数
+app.MapGet("/protected", func(c *web.HttpContext) web.IActionResult {
+    token := web.Header[string](c, "Authorization").Required().Value()
+    version := web.Header[int](c, "X-API-Version").Default(1)
+    
+    return c.Ok(web.M{"token": token, "version": version})
+})
+```
+
+#### 参数验证
+
+使用 `Required()` 和 `Custom()` 方法进行验证：
+
+```go
+app.POST("/register", func(c *web.HttpContext) web.IActionResult {
+    // 必填参数
+    username := web.Query[string](c, "username").
+        Required().
+        Custom(func(v string) error {
+            if len(v) < 3 || len(v) > 20 {
+                return errors.New("用户名长度必须在 3-20 个字符之间")
+            }
+            return nil
+        }).
+        Value()
+    
+    // 邮箱验证
+    email := web.Query[string](c, "email").
+        Required().
+        Custom(func(v string) error {
+            if !strings.Contains(v, "@") {
+                return errors.New("邮箱格式不正确")
+            }
+            return nil
+        }).
+        Value()
+    
+    // 数字范围验证
+    age := web.Query[int](c, "age").
+        Required().
+        Custom(func(v int) error {
+            if v < 18 || v > 120 {
+                return errors.New("年龄必须在 18-120 之间")
+            }
+            return nil
+        }).
+        Value()
+    
+    // 验证错误会自动返回 400 Bad Request
+    // 无需手动检查
+    
+    return c.Ok(web.M{
+        "username": username,
+        "email":    email,
+        "age":      age,
+    })
+})
+```
+
+#### 支持的类型
+
+- `string`
+- `int`, `int8`, `int16`, `int32`, `int64`
+- `uint`, `uint8`, `uint16`, `uint32`, `uint64`
+- `float32`, `float64`
+- `bool`
+- `time.Time`
+- `time.Duration`
+
+#### 手动错误处理
+
+如果需要自定义错误响应，使用 `Get()` 方法：
+
+```go
+app.MapGet("/search", func(c *web.HttpContext) web.IActionResult {
+    keyword, err := web.Query[string](c, "keyword").
+        Required().
+        Custom(func(v string) error {
+            if len(v) < 2 {
+                return errors.New("关键词至少需要 2 个字符")
+            }
+            return nil
+        }).
+        Get()
+    
+    if err != nil {
+        return c.BadRequest(fmt.Sprintf("搜索失败: %v", err))
+    }
+    
+    return c.Ok(web.M{"keyword": keyword})
+})
+```
+
+#### 常用验证模式
+
+```go
+// 数字范围
+size := web.Query[int](c, "size").Custom(func(v int) error {
+    if v < 1 || v > 100 {
+        return errors.New("尺寸必须在 1-100 之间")
+    }
+    return nil
+}).Default(10)
+
+// 字符串长度
+bio := web.Query[string](c, "bio").Custom(func(v string) error {
+    if len(v) > 500 {
+        return errors.New("简介不能超过 500 个字符")
+    }
+    return nil
+}).Value()
+
+// 正则表达式
+phone := web.Query[string](c, "phone").Custom(func(v string) error {
+    matched, _ := regexp.MatchString(`^1[3-9]\d{9}$`, v)
+    if !matched {
+        return errors.New("手机号格式不正确")
+    }
+    return nil
+}).Value()
+
+// 枚举值
+status := web.Query[string](c, "status").Custom(func(v string) error {
+    validValues := []string{"pending", "active", "inactive"}
+    for _, valid := range validValues {
+        if v == valid {
+            return nil
+        }
+    }
+    return errors.New("状态值无效")
+}).Default("pending")
+```
+
+**📖 详细迁移指南**: 参见 [MIGRATION_PARAMS.md](./MIGRATION_PARAMS.md)
+
+### 路径参数（传统方式）
 
 ```go
 // 定义路径参数
 app.MapGet("/users/:id", func(c *web.HttpContext) web.IActionResult {
-    // 获取路径参数
+    // 方式 1: 直接获取字符串 (推荐使用泛型 API)
     id := c.RawCtx().Param("id")
     
-    // 或使用参数验证器
-    idInt := c.Params().PathInt("id").Value()
+    // 方式 2: 使用 Deprecated 的参数验证器
+    // idInt := c.Params().PathInt("id").Value()  // ⚠️ 已废弃，请使用 web.Path[int]
+    
+    // 方式 3: 使用新的泛型 API (推荐) ⭐
+    idInt, err := web.Path[int](c, "id").Value()
+    if err != nil {
+        return err
+    }
     
     return c.Ok(web.M{"id": idInt})
 })

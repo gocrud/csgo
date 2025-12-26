@@ -1,4 +1,4 @@
-package configuration
+package config
 
 import (
 	"strconv"
@@ -10,9 +10,9 @@ import (
 //
 // Usage:
 //
-//	port := configuration.GetValue(config, "server:port", 8080)
-//	host := configuration.GetValue(config, "server:host", "localhost")
-//	timeout := configuration.GetValue(config, "timeout", 30*time.Second)
+//	port := config.GetValue(config, "server:port", 8080)
+//	host := config.GetValue(config, "server:host", "localhost")
+//	timeout := config.GetValue(config, "timeout", 30*time.Second)
 func GetValue[T any](config IConfiguration, key string, defaultValue T) T {
 	value := config.Get(key)
 	if value == "" {
@@ -104,7 +104,7 @@ func GetValue[T any](config IConfiguration, key string, defaultValue T) T {
 //
 // Usage:
 //
-//	port := configuration.MustGetValue[int](config, "server:port")
+//	port := config.MustGetValue[int](config, "server:port")
 func MustGetValue[T any](config IConfiguration, key string) T {
 	value := config.Get(key)
 	if value == "" {
@@ -123,7 +123,7 @@ func MustGetValue[T any](config IConfiguration, key string) T {
 //
 // Usage:
 //
-//	port, err := configuration.GetValueOrError[int](config, "server:port", 8080)
+//	port, err := config.GetValueOrError[int](config, "server:port", 8080)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}

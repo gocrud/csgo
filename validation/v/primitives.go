@@ -64,6 +64,10 @@ func (i *Int) Value() int {
 
 type String string
 
+func (s *String) HasValue() bool {
+	return len(*s) > 0
+}
+
 func (s *String) MinLen(min int) *String {
 	validation.RecordRule(unsafe.Pointer(s), "min_len", min)
 	return s

@@ -7,12 +7,7 @@ import (
 	"github.com/gocrud/csgo/openapi"
 )
 
-// TypeOf returns the reflect.Type of T without instantiation.
-// This is a helper function for use with OpenApiBuilder methods.
-// Example: api.Body(router.TypeOf[CreateUserRequest]())
-func TypeOf[T any]() reflect.Type {
-	return reflect.TypeOf((*T)(nil)).Elem()
-}
+
 
 // OpenApiBuilder provides a fluent API for configuring OpenAPI metadata.
 type OpenApiBuilder struct {
@@ -251,8 +246,8 @@ func (o *OpenApiBuilder) Params(typ reflect.Type) *OpenApiBuilder {
 	return o
 }
 
-// Auth adds authentication requirement.
-func (o *OpenApiBuilder) Auth(name string, scopes ...string) *OpenApiBuilder {
+// Security adds authentication requirement.
+func (o *OpenApiBuilder) Security(name string, scopes ...string) *OpenApiBuilder {
 	o.builder.AddApiSecurityRequirement(name, scopes)
 	return o
 }
