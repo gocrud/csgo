@@ -12,19 +12,19 @@ import (
 // Build、Count 和 GetDescriptors 方法在具体类型上可用，但不在接口中。
 type IServiceCollection interface {
 	// Add 使用构造函数注册单例服务。
-	Add(constructor interface{}) IServiceCollection
+	Add(constructor any) IServiceCollection
 
 	// AddInstance 注册单例实例（预先创建的对象）。
-	AddInstance(instance interface{}) IServiceCollection
+	AddInstance(instance any) IServiceCollection
 
 	// AddNamed 注册命名单例服务。
-	AddNamed(name string, constructor interface{}) IServiceCollection
+	AddNamed(name string, constructor any) IServiceCollection
 
 	// TryAdd 尝试添加单例服务（如果不存在）。
-	TryAdd(constructor interface{}) IServiceCollection
+	TryAdd(constructor any) IServiceCollection
 
 	// AddHostedService 注册托管服务（后台服务）。
-	AddHostedService(constructor interface{}) IServiceCollection
+	AddHostedService(constructor any) IServiceCollection
 }
 
 // serviceCollection 是 IServiceCollection 的具体实现。
@@ -53,7 +53,7 @@ func BuildServiceProvider(services IServiceCollection) IServiceProvider {
 }
 
 // Add 使用构造函数注册单例服务。
-func (s *serviceCollection) Add(constructor interface{}) IServiceCollection {
+func (s *serviceCollection) Add(constructor any) IServiceCollection {
 	if err := s.register(constructor, Singleton); err != nil {
 		panic(fmt.Sprintf("failed to register service: %v", err))
 	}
@@ -61,7 +61,7 @@ func (s *serviceCollection) Add(constructor interface{}) IServiceCollection {
 }
 
 // TryAdd 尝试添加单例（如果不存在）。
-func (s *serviceCollection) TryAdd(constructor interface{}) IServiceCollection {
+func (s *serviceCollection) TryAdd(constructor any) IServiceCollection {
 	ctorType := reflect.TypeOf(constructor)
 	if ctorType.Kind() != reflect.Func {
 		return s
@@ -78,7 +78,7 @@ func (s *serviceCollection) TryAdd(constructor interface{}) IServiceCollection {
 }
 
 // AddInstance 注册单例实例（预先创建的对象）。
-func (s *serviceCollection) AddInstance(instance interface{}) IServiceCollection {
+func (s *serviceCollection) AddInstance(instance any) IServiceCollection {
 	if instance == nil {
 		panic("instance cannot be nil")
 	}
@@ -108,13 +108,13 @@ func (s *serviceCollection) AddInstance(instance interface{}) IServiceCollection
 
 // AddHostedService 注册托管服务。
 // 该服务将在主机启动时启动，在主机停止时停止。
-func (s *serviceCollection) AddHostedService(constructor interface{}) IServiceCollection {
+func (s *serviceCollection) AddHostedService(constructor any) IServiceCollection {
 	// 注册为 Singleton（托管服务应该是单例）
 	return s.Add(constructor)
 }
 
 // AddNamed 注册命名单例服务。
-func (s *serviceCollection) AddNamed(name string, constructor interface{}) IServiceCollection {
+func (s *serviceCollection) AddNamed(name string, constructor any) IServiceCollection {
 	if err := s.registerKeyed(constructor, Singleton, name); err != nil {
 		panic(fmt.Sprintf("failed to register named service: %v", err))
 	}
@@ -163,7 +163,7 @@ func (s *serviceCollection) GetDescriptors() []ServiceDescriptor {
 }
 
 // register 是注册单例服务的辅助函数。
-func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLifetime) error {
+func (s *serviceCollection) register(constructor any, lifetime ServiceLifetime) error {
 	if constructor == nil {
 		return fmt.Errorf("constructor cannot be nil")
 	}
@@ -197,7 +197,7 @@ func (s *serviceCollection) register(constructor interface{}, lifetime ServiceLi
 }
 
 // registerKeyed 是注册命名单例服务的辅助函数。
-func (s *serviceCollection) registerKeyed(constructor interface{}, lifetime ServiceLifetime, serviceKey string) error {
+func (s *serviceCollection) registerKeyed(constructor any, lifetime ServiceLifetime, serviceKey string) error {
 	if constructor == nil {
 		return fmt.Errorf("constructor cannot be nil")
 	}
